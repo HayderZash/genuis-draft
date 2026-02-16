@@ -26,8 +26,6 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
       html += project.content['abstract'];
     }
     // Lists of figures/tables
-    if (project.content['list_of_figures']) html += project.content['list_of_figures'];
-    if (project.content['list_of_tables']) html += project.content['list_of_tables'];
     // Chapters
     project.chapters.forEach((ch, i) => {
       const chContent = project.content[`chapter_${i}`] || '';
