@@ -87,6 +87,12 @@ export const translations = {
   referenceCount: { ar: 'عدد المصادر', en: 'Number of References' },
   regenerateChapter: { ar: 'إعادة توليد الفصل', en: 'Regenerate Chapter' },
   regeneratingChapter: { ar: 'جاري إعادة توليد الفصل...', en: 'Regenerating chapter...' },
+  includeToc: { ar: 'جدول المحتويات', en: 'Table of Contents' },
+  includeListOfTables: { ar: 'قائمة الجداول', en: 'List of Tables' },
+  includeListOfFigures: { ar: 'قائمة الأشكال', en: 'List of Figures' },
+  tablesAndLists: { ar: 'الجداول والقوائم', en: 'Tables & Lists' },
+  generatingAbstract: { ar: 'جاري توليد الملخص...', en: 'Generating abstract...' },
+  generatingToc: { ar: 'جاري توليد جدول المحتويات...', en: 'Generating table of contents...' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
