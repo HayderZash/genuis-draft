@@ -114,18 +114,6 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         regeneratingIndex={regeneratingIndex}
       />
 
-      {/* Lists */}
-      <div className="space-y-3">
-        <Label className="font-semibold">{t('tablesAndLists')}</Label>
-        <div className="flex items-center gap-2">
-          <Checkbox id="lot" checked={project.include_list_of_tables ?? false} onCheckedChange={(v) => onUpdate({ include_list_of_tables: !!v })} />
-          <label htmlFor="lot" className="text-sm cursor-pointer">{t('includeListOfTables')}</label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox id="lof" checked={project.include_list_of_figures ?? false} onCheckedChange={(v) => onUpdate({ include_list_of_figures: !!v })} />
-          <label htmlFor="lof" className="text-sm cursor-pointer">{t('includeListOfFigures')}</label>
-        </div>
-      </div>
 
       <Button onClick={onGenerate} disabled={generating || !project.title} className="w-full gap-2">
         {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
