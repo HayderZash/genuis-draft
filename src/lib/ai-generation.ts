@@ -126,7 +126,8 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
       : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
 
-    content[`chapter_${i}`] = await callAI(provider, apiKey, systemPrompt, userPrompt, 4000, 0.7);
+    const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 4000, 0.7);
+    content[`chapter_${i}`] = cleanHtmlOutput(raw);
     onProgress(progressStep, baseProgress + (75 / totalChapters) * 0.8);
   }
 
@@ -138,8 +139,44 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
     ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع تحتوي على ${refCount} مصدر بتنسيق APA. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
     : `Based on a research paper titled "${project.title}" about "${project.abstract}", write an APA-style reference list with exactly ${refCount} references. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
 
-  content['references'] = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
+  const rawRefs = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
+  content['references'] = cleanHtmlOutput(rawRefs);
 
   onProgress(t('finalizing'), 98);
   return content;
+}
+
+/** Strip markdown code fences from AI output */
+function cleanHtmlOutput(text: string): string {
+  return text
+    .replace(/^```html\s*/gi, '')
+    .replace(/^```\s*/gm, '')
+    .replace(/```\s*$/g, '')
+    .trim();
+}
+
+/** Regenerate a single chapter */
+export async function regenerateChapter({ apiKey, provider, project, lang, chapterIndex, onProgress, t }: GenerateParams & { chapterIndex: number }): Promise<string> {
+  const chapterName = lang === 'ar' ? project.chapters[chapterIndex].nameAr : project.chapters[chapterIndex].name;
+  onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 20);
+
+  const chapterPages = project.chapter_pages?.[chapterIndex];
+  const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : (DEFAULT_WORD_TARGETS[chapterIndex] || 1200);
+  const chapterNum = chapterIndex + 1;
+  const isLast = chapterIndex === project.chapters.length - 1;
+  const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
+  const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
+
+  const systemPrompt = lang === 'ar'
+    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. أضف [الشكل ${chapterNum}.X: الوصف] بين الفقرات حيث يناسب (حيث X هو رقم تسلسلي داخل الفصل).`
+    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. Insert [Figure ${chapterNum}.X: Description] between paragraphs where appropriate (X is sequential within the chapter).`;
+
+  const userPrompt = lang === 'ar'
+    ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
+    : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
+
+  onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 50);
+  const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 4000, 0.7);
+  onProgress(t('finalizing'), 90);
+  return cleanHtmlOutput(raw);
 }

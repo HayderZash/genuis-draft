@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, Plus, Trash2, Lock } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Lock, RefreshCw } from 'lucide-react';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -24,14 +24,18 @@ interface Props {
   chapterPages: number[];
   onChange: (chapters: Chapter[]) => void;
   onPageChange: (index: number, pages: number) => void;
+  onRegenerate?: (index: number) => void;
+  regeneratingIndex?: number;
 }
 
-const SortableChapter = ({ chapter, index, pages, onRename, onDelete, onPageChange, locked }: {
+const SortableChapter = ({ chapter, index, pages, onRename, onDelete, onPageChange, onRegenerate, locked, regenerating }: {
   chapter: Chapter; index: number; pages: number;
   onRename: (i: number, name: string, nameAr: string) => void;
   onDelete: (i: number) => void;
   onPageChange: (i: number, pages: number) => void;
+  onRegenerate?: (i: number) => void;
   locked: boolean;
+  regenerating: boolean;
 }) => {
   const { t } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: `ch-${index}` });
@@ -61,6 +65,11 @@ const SortableChapter = ({ chapter, index, pages, onRename, onDelete, onPageChan
         className="h-8 text-sm w-16"
         title={t('pagesPerChapter')}
       />
+      {onRegenerate && (
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onRegenerate(index)} disabled={regenerating} title={regenerating ? '...' : 'Regenerate'}>
+          <RefreshCw className={`h-3 w-3 ${regenerating ? 'animate-spin' : ''}`} />
+        </Button>
+      )}
       {!locked && (
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onDelete(index)}>
           <Trash2 className="h-3 w-3" />
@@ -70,7 +79,7 @@ const SortableChapter = ({ chapter, index, pages, onRename, onDelete, onPageChan
   );
 };
 
-export const ChapterList = ({ chapters, chapterCount, chapterPages, onChange, onPageChange }: Props) => {
+export const ChapterList = ({ chapters, chapterCount, chapterPages, onChange, onPageChange, onRegenerate, regeneratingIndex }: Props) => {
   const { t } = useLanguage();
   const locked = chapterCount === 5;
   const sensors = useSensors(
@@ -122,7 +131,9 @@ export const ChapterList = ({ chapters, chapterCount, chapterPages, onChange, on
                 onRename={handleRename}
                 onDelete={handleDelete}
                 onPageChange={onPageChange}
+                onRegenerate={onRegenerate}
                 locked={locked}
+                regenerating={regeneratingIndex === i}
               />
             ))}
           </div>

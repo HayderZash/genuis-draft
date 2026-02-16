@@ -9,7 +9,7 @@ import { ProjectSidebar } from '@/components/project/ProjectSidebar';
 import { ResearchEditor } from '@/components/project/ResearchEditor';
 import { GenerationProgress } from '@/components/project/GenerationProgress';
 import { PageSettingsPanel } from '@/components/project/PageSettingsPanel';
-import { generateResearch } from '@/lib/ai-generation';
+import { generateResearch, regenerateChapter } from '@/lib/ai-generation';
 import { exportToDocx } from '@/lib/export-docx';
 import { ArrowLeft, PanelLeftClose, PanelLeft, Download, Settings2 } from 'lucide-react';
 
@@ -44,6 +44,7 @@ const ProjectEditor = () => {
   const [generationState, setGenerationState] = useState<{ active: boolean; step: string; progress: number }>({
     active: false, step: '', progress: 0,
   });
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number>(-1);
 
   const fetchProject = useCallback(async () => {
     if (!id) return;
@@ -111,6 +112,39 @@ const ProjectEditor = () => {
     }
   };
 
+  const handleRegenerateChapter = async (chapterIndex: number) => {
+    if (!project) return;
+    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini') || 'openai';
+    const apiKey = provider === 'gemini'
+      ? localStorage.getItem('gemini_api_key')
+      : localStorage.getItem('openai_api_key');
+    if (!apiKey) {
+      toast({ title: t('apiKeyRequired'), variant: 'destructive' });
+      return;
+    }
+    setRegeneratingIndex(chapterIndex);
+    setGenerationState({ active: true, step: t('regeneratingChapter'), progress: 10 });
+    try {
+      const chapterContent = await regenerateChapter({
+        apiKey, provider, project,
+        lang: project.research_language as 'ar' | 'en',
+        chapterIndex,
+        onProgress: (step, progress) => setGenerationState({ active: true, step, progress }),
+        t,
+      });
+      const newContent = { ...project.content, [`chapter_${chapterIndex}`]: chapterContent };
+      delete newContent._full;
+      await saveProject({ content: newContent });
+      setGenerationState({ active: false, step: '', progress: 100 });
+      toast({ title: lang === 'ar' ? 'تم إعادة توليد الفصل بنجاح!' : 'Chapter regenerated successfully!' });
+    } catch (err: any) {
+      setGenerationState({ active: false, step: '', progress: 0 });
+      toast({ title: err.message, variant: 'destructive' });
+    } finally {
+      setRegeneratingIndex(-1);
+    }
+  };
+
   const handleExport = () => {
     if (!project) return;
     exportToDocx(project, lang);
@@ -123,7 +157,7 @@ const ProjectEditor = () => {
       {/* Sidebar */}
       {sidebarOpen && (
         <div className="w-80 shrink-0 border-e overflow-y-auto bg-muted/30 p-4">
-          <ProjectSidebar project={project} onUpdate={saveProject} onGenerate={handleGenerate} generating={generationState.active} />
+          <ProjectSidebar project={project} onUpdate={saveProject} onGenerate={handleGenerate} generating={generationState.active} onRegenerateChapter={handleRegenerateChapter} regeneratingIndex={regeneratingIndex} />
         </div>
       )}
 
