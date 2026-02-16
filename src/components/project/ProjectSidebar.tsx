@@ -114,13 +114,9 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         regeneratingIndex={regeneratingIndex}
       />
 
-      {/* Tables & Lists */}
+      {/* Lists */}
       <div className="space-y-3">
         <Label className="font-semibold">{t('tablesAndLists')}</Label>
-        <div className="flex items-center gap-2">
-          <Checkbox id="toc" checked={project.include_toc ?? true} onCheckedChange={(v) => onUpdate({ include_toc: !!v })} />
-          <label htmlFor="toc" className="text-sm cursor-pointer">{t('includeToc')}</label>
-        </div>
         <div className="flex items-center gap-2">
           <Checkbox id="lot" checked={project.include_list_of_tables ?? false} onCheckedChange={(v) => onUpdate({ include_list_of_tables: !!v })} />
           <label htmlFor="lot" className="text-sm cursor-pointer">{t('includeListOfTables')}</label>

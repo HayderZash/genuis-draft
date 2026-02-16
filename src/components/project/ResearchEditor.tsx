@@ -25,10 +25,9 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
     if (project.content['abstract']) {
       html += project.content['abstract'];
     }
-    // Table of contents sections
-    if (project.content['toc']) html += project.content['toc'];
-    if (project.content['list_of_tables']) html += project.content['list_of_tables'];
+    // Lists of figures/tables
     if (project.content['list_of_figures']) html += project.content['list_of_figures'];
+    if (project.content['list_of_tables']) html += project.content['list_of_tables'];
     // Chapters
     project.chapters.forEach((ch, i) => {
       const chContent = project.content[`chapter_${i}`] || '';

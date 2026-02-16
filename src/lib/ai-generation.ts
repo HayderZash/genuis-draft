@@ -24,7 +24,7 @@ async function callAI(
   if (provider === 'gemini') {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const maxRetries = 3;
-    const initialDelay = 30000; // 30 seconds for free tier
+    const initialDelay = 30000;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -100,22 +100,23 @@ async function callAI(
 export async function generateResearch({ apiKey, provider, project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
   const content: Record<string, string> = {};
   const totalChapters = project.chapters.length;
+  const researchLang = project.research_language || lang;
 
-  // Generate Abstract first
+  // Generate Abstract in the research language
   onProgress(t('generatingAbstract'), 3);
-  const abstractSystemPrompt = lang === 'ar'
-    ? 'أنت خبير أكاديمي. اكتب ملخصاً أكاديمياً بتنسيق HTML. استخدم <h1> للعنوان و <p> للنص. حجم النص 14.'
-    : 'You are an academic expert. Write an academic abstract in HTML. Use <h1> for title and <p> for text.';
-  const abstractUserPrompt = lang === 'ar'
-    ? `اكتب ملخصاً أكاديمياً (Abstract) لبحث بعنوان "${project.title}". التفاصيل: ${project.abstract || 'غير محدد'}. اكتب حوالي 200-300 كلمة.`
-    : `Write an academic abstract for a research paper titled "${project.title}". Details: ${project.abstract || 'Not specified'}. Write approximately 200-300 words.`;
+  const abstractSystemPrompt = researchLang === 'ar'
+    ? 'أنت خبير أكاديمي. اكتب ملخصاً أكاديمياً (Abstract) بتنسيق HTML. استخدم <h1> للعنوان و <p> للنص. حجم النص 14. اكتب باللغة العربية فقط.'
+    : 'You are an academic expert. Write an academic abstract in HTML. Use <h1> for title and <p> for text. Write in English only.';
+  const abstractUserPrompt = researchLang === 'ar'
+    ? `اكتب ملخصاً أكاديمياً (Abstract) لبحث بعنوان "${project.title}". يجب أن يكون الملخص باللغة العربية ويلخص أهداف البحث ومنهجيته وأهم نتائجه في 200-300 كلمة. لا تكتب تفاصيل البحث المدخلة وإنما اكتب ملخصاً أكاديمياً حقيقياً.`
+    : `Write an academic abstract for a research paper titled "${project.title}". The abstract should summarize the research objectives, methodology, and key findings in 200-300 words. Do not copy the input details; write a proper academic abstract.`;
   const rawAbstract = await callAI(provider, apiKey, abstractSystemPrompt, abstractUserPrompt, 1500, 0.5);
   content['abstract'] = cleanHtmlOutput(rawAbstract);
 
   onProgress(t('analyzingTopic'), 5);
 
   for (let i = 0; i < totalChapters; i++) {
-    const chapterName = lang === 'ar' ? project.chapters[i].nameAr : project.chapters[i].name;
+    const chapterName = researchLang === 'ar' ? project.chapters[i].nameAr : project.chapters[i].name;
     const progressStep = `${t('draftingChapter')} ${i + 1}: ${chapterName}`;
     const baseProgress = 10 + (i / totalChapters) * 70;
     onProgress(progressStep, baseProgress);
@@ -129,19 +130,19 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
       : '';
     const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
-    const figureInstruction = lang === 'ar'
+    const figureInstruction = researchLang === 'ar'
       ? `أضف عناوين الأشكال بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p> (حيث X رقم تسلسلي). عنوان الشكل يكون مائلاً وبحجم 12.`
       : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p> (X is sequential). Figure captions must be italic and 12px size.`;
 
-    const refStyleInstruction = lang === 'ar'
-      ? 'عند الإشارة إلى المصادر في النص، استخدم الترقيم بين أقواس مربعة مثل [1] و [2] وهكذا.'
-      : 'When citing references in text, use numbered brackets like [1], [2], etc.';
+    const noRefsInChapter = researchLang === 'ar'
+      ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. المصادر ستكون في نهاية البحث فقط. استخدم فقط الإشارة للمصادر بالأرقام في النص مثل [1] و[2].'
+      : 'Do NOT include a references or bibliography section at the end of this chapter. References will only appear at the end of the entire paper. Only use in-text citations with numbered brackets like [1], [2].';
 
-    const systemPrompt = lang === 'ar'
-      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${refStyleInstruction}`
-      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${refStyleInstruction}`;
+    const systemPrompt = researchLang === 'ar'
+      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
+      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
-    const userPrompt = lang === 'ar'
+    const userPrompt = researchLang === 'ar'
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
       : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
 
@@ -153,41 +154,71 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
   // Generate references with numbered style [1], [2]
   onProgress(t('formattingCitations'), 85);
   const refCount = project.reference_count || 10;
-  const refsSystemPrompt = lang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML.' : 'You are an academic expert. Write in HTML format.';
-  const refsPrompt = lang === 'ar'
+  const refsSystemPrompt = researchLang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML.' : 'You are an academic expert. Write in HTML format.';
+  const refsPrompt = researchLang === 'ar'
     ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع مرقمة تحتوي على ${refCount} مصدر. رقم كل مصدر بين أقواس مربعة [1]، [2]، إلخ. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
     : `Based on a research paper titled "${project.title}" about "${project.abstract}", write a numbered reference list with exactly ${refCount} references. Number each reference with square brackets [1], [2], etc. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
 
   const rawRefs = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
   content['references'] = cleanHtmlOutput(rawRefs);
 
-  // Generate TOC/Lists if requested
-  if (project.include_toc || project.include_list_of_tables || project.include_list_of_figures) {
-    onProgress(t('generatingToc'), 92);
-    const tocParts: string[] = [];
-    if (project.include_toc) {
-      const tocTitle = lang === 'ar' ? 'جدول المحتويات' : 'Table of Contents';
-      let tocHtml = `<h1>${tocTitle}</h1>`;
-      project.chapters.forEach((ch, i) => {
-        const name = lang === 'ar' ? ch.nameAr : ch.name;
-        tocHtml += `<p style="font-size:14px;">${lang === 'ar' ? `الفصل ${i + 1}: ${name}` : `Chapter ${i + 1}: ${name}`}</p>`;
-      });
-      tocHtml += `<p style="font-size:14px;">${lang === 'ar' ? 'المراجع' : 'References'}</p>`;
-      tocParts.push(tocHtml);
-    }
-    if (project.include_list_of_tables) {
-      const title = lang === 'ar' ? 'قائمة الجداول' : 'List of Tables';
-      tocParts.push(`<h1>${title}</h1><p style="font-size:14px;">${lang === 'ar' ? 'سيتم تحديثها بعد التوليد' : 'Will be updated after generation'}</p>`);
-    }
-    if (project.include_list_of_figures) {
-      const title = lang === 'ar' ? 'قائمة الأشكال' : 'List of Figures';
-      tocParts.push(`<h1>${title}</h1><p style="font-size:14px;">${lang === 'ar' ? 'سيتم تحديثها بعد التوليد' : 'Will be updated after generation'}</p>`);
-    }
-    content['toc'] = tocParts.join('');
+  // Auto-generate List of Figures and List of Tables from content
+  onProgress(t('generatingToc'), 92);
+
+  if (project.include_list_of_figures) {
+    content['list_of_figures'] = extractListFromContent(content, 'figures', researchLang);
+  }
+  if (project.include_list_of_tables) {
+    content['list_of_tables'] = extractListFromContent(content, 'tables', researchLang);
   }
 
   onProgress(t('finalizing'), 98);
   return content;
+}
+
+/** Extract figure or table captions from generated content */
+function extractListFromContent(content: Record<string, string>, type: 'figures' | 'tables', lang: string): string {
+  const allContent = Object.entries(content)
+    .filter(([key]) => key.startsWith('chapter_'))
+    .map(([, val]) => val)
+    .join('\n');
+
+  const items: string[] = [];
+
+  if (type === 'figures') {
+    // Match figure captions like [الشكل 1.1: ...] or [Figure 1.1: ...]
+    const figureRegex = lang === 'ar'
+      ? /\[الشكل\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/g
+      : /\[Figure\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/gi;
+    let match;
+    while ((match = figureRegex.exec(allContent)) !== null) {
+      const num = match[1];
+      const desc = match[2].trim();
+      items.push(`<p style="font-size:14px;">${lang === 'ar' ? `الشكل ${num}: ${desc}` : `Figure ${num}: ${desc}`}</p>`);
+    }
+  } else {
+    // Match table captions like [الجدول 1.1: ...] or [Table 1.1: ...]
+    const tableRegex = lang === 'ar'
+      ? /\[الجدول\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/g
+      : /\[Table\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/gi;
+    let match;
+    while ((match = tableRegex.exec(allContent)) !== null) {
+      const num = match[1];
+      const desc = match[2].trim();
+      items.push(`<p style="font-size:14px;">${lang === 'ar' ? `الجدول ${num}: ${desc}` : `Table ${num}: ${desc}`}</p>`);
+    }
+  }
+
+  const title = type === 'figures'
+    ? (lang === 'ar' ? 'قائمة الأشكال' : 'List of Figures')
+    : (lang === 'ar' ? 'قائمة الجداول' : 'List of Tables');
+
+  if (items.length === 0) {
+    const emptyMsg = lang === 'ar' ? 'لا توجد عناصر' : 'No items found';
+    return `<h1>${title}</h1><p style="font-size:14px;">${emptyMsg}</p>`;
+  }
+
+  return `<h1>${title}</h1>${items.join('')}`;
 }
 
 /** Strip markdown code fences from AI output */
@@ -201,7 +232,8 @@ function cleanHtmlOutput(text: string): string {
 
 /** Regenerate a single chapter */
 export async function regenerateChapter({ apiKey, provider, project, lang, chapterIndex, onProgress, t }: GenerateParams & { chapterIndex: number }): Promise<string> {
-  const chapterName = lang === 'ar' ? project.chapters[chapterIndex].nameAr : project.chapters[chapterIndex].name;
+  const researchLang = project.research_language || lang;
+  const chapterName = researchLang === 'ar' ? project.chapters[chapterIndex].nameAr : project.chapters[chapterIndex].name;
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 20);
 
   const chapterPages = project.chapter_pages?.[chapterIndex];
@@ -211,19 +243,19 @@ export async function regenerateChapter({ apiKey, provider, project, lang, chapt
   const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
   const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
-  const figureInstruction = lang === 'ar'
+  const figureInstruction = researchLang === 'ar'
     ? `أضف عناوين الأشكال بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p> (حيث X رقم تسلسلي). عنوان الشكل يكون مائلاً وبحجم 12.`
     : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p> (X is sequential). Figure captions must be italic and 12px size.`;
 
-  const refStyleInstruction = lang === 'ar'
-    ? 'عند الإشارة إلى المصادر في النص، استخدم الترقيم بين أقواس مربعة مثل [1] و [2] وهكذا.'
-    : 'When citing references in text, use numbered brackets like [1], [2], etc.';
+  const noRefsInChapter = researchLang === 'ar'
+    ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. المصادر ستكون في نهاية البحث فقط. استخدم فقط الإشارة للمصادر بالأرقام في النص مثل [1] و[2].'
+    : 'Do NOT include a references or bibliography section at the end of this chapter. References will only appear at the end of the entire paper. Only use in-text citations with numbered brackets like [1], [2].';
 
-  const systemPrompt = lang === 'ar'
-    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${refStyleInstruction}`
-    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${refStyleInstruction}`;
+  const systemPrompt = researchLang === 'ar'
+    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
+    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
-  const userPrompt = lang === 'ar'
+  const userPrompt = researchLang === 'ar'
     ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
     : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
 
