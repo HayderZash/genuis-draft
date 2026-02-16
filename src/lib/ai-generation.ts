@@ -23,40 +23,52 @@ async function callAI(
   if (provider === 'gemini') {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const maxRetries = 3;
-    let lastError: Error | null = null;
+    const initialDelay = 30000; // 30 seconds for free tier
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 5000 * attempt));
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
+              generationConfig: { maxOutputTokens: maxTokens, temperature },
+            }),
+          }
+        );
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
-            generationConfig: { maxOutputTokens: maxTokens, temperature },
-          }),
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          let delay = initialDelay;
+          if (retryAfter) {
+            const parsed = parseInt(retryAfter, 10);
+            if (!isNaN(parsed)) delay = parsed * 1000;
+          }
+          const jitter = Math.random() * 1000;
+          const waitTime = delay + jitter;
+          console.warn(`Rate limit hit. Retrying in ${(waitTime / 1000).toFixed(1)}s... (Attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, waitTime));
+          continue;
         }
-      );
 
-      if (response.status === 429) {
-        lastError = new Error('Rate limit exceeded, retrying...');
-        continue;
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } catch (error: any) {
+        if (attempt === maxRetries - 1) throw error;
+        const waitTime = initialDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        console.warn(`Error, retrying in ${(waitTime / 1000).toFixed(1)}s...`);
+        await new Promise(r => setTimeout(r, waitTime));
       }
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      // Add delay between successful requests to avoid rate limits
-      await new Promise(r => setTimeout(r, 1500));
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
 
-    throw lastError || new Error('Gemini API failed after retries');
+    throw new Error('Gemini API failed after retries');
   }
 
   // OpenAI
