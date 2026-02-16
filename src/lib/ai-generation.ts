@@ -156,8 +156,8 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
   const refCount = project.reference_count || 10;
   const refsSystemPrompt = researchLang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML.' : 'You are an academic expert. Write in HTML format.';
   const refsPrompt = researchLang === 'ar'
-    ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع مرقمة تحتوي على ${refCount} مصدر. رقم كل مصدر بين أقواس مربعة [1]، [2]، إلخ. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
-    : `Based on a research paper titled "${project.title}" about "${project.abstract}", write a numbered reference list with exactly ${refCount} references. Number each reference with square brackets [1], [2], etc. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
+    ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع مرقمة تحتوي على ${refCount} مصدر بالضبط، لا أقل ولا أكثر. رقم كل مصدر بين أقواس مربعة [1]، [2]، إلخ حتى [${refCount}]. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
+    : `Based on a research paper titled "${project.title}" about "${project.abstract}", write a numbered reference list with EXACTLY ${refCount} references, no more and no less. Number each reference with square brackets [1], [2], etc. up to [${refCount}]. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
 
   const rawRefs = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
   content['references'] = cleanHtmlOutput(rawRefs);
@@ -183,29 +183,23 @@ function extractListFromContent(content: Record<string, string>, type: 'figures'
     .map(([, val]) => val)
     .join('\n');
 
-  const items: string[] = [];
+  const items: { num: string; desc: string }[] = [];
 
   if (type === 'figures') {
-    // Match figure captions like [الشكل 1.1: ...] or [Figure 1.1: ...]
     const figureRegex = lang === 'ar'
       ? /\[الشكل\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/g
       : /\[Figure\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/gi;
     let match;
     while ((match = figureRegex.exec(allContent)) !== null) {
-      const num = match[1];
-      const desc = match[2].trim();
-      items.push(`<p style="font-size:14px;">${lang === 'ar' ? `الشكل ${num}: ${desc}` : `Figure ${num}: ${desc}`}</p>`);
+      items.push({ num: match[1], desc: match[2].trim() });
     }
   } else {
-    // Match table captions like [الجدول 1.1: ...] or [Table 1.1: ...]
     const tableRegex = lang === 'ar'
       ? /\[الجدول\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/g
       : /\[Table\s+(\d+\.\d+)\s*:\s*([^\]]+)\]/gi;
     let match;
     while ((match = tableRegex.exec(allContent)) !== null) {
-      const num = match[1];
-      const desc = match[2].trim();
-      items.push(`<p style="font-size:14px;">${lang === 'ar' ? `الجدول ${num}: ${desc}` : `Table ${num}: ${desc}`}</p>`);
+      items.push({ num: match[1], desc: match[2].trim() });
     }
   }
 
@@ -213,12 +207,25 @@ function extractListFromContent(content: Record<string, string>, type: 'figures'
     ? (lang === 'ar' ? 'قائمة الأشكال' : 'List of Figures')
     : (lang === 'ar' ? 'قائمة الجداول' : 'List of Tables');
 
+  const numHeader = lang === 'ar' ? 'الرقم' : 'Number';
+  const descHeader = type === 'figures'
+    ? (lang === 'ar' ? 'عنوان الشكل' : 'Figure Title')
+    : (lang === 'ar' ? 'عنوان الجدول' : 'Table Title');
+
   if (items.length === 0) {
     const emptyMsg = lang === 'ar' ? 'لا توجد عناصر' : 'No items found';
     return `<h1>${title}</h1><p style="font-size:14px;">${emptyMsg}</p>`;
   }
 
-  return `<h1>${title}</h1>${items.join('')}`;
+  const prefix = type === 'figures'
+    ? (lang === 'ar' ? 'الشكل' : 'Figure')
+    : (lang === 'ar' ? 'الجدول' : 'Table');
+
+  const rows = items.map(item =>
+    `<tr><td style="font-size:14px;padding:6px 12px;border:1px solid #999;">${prefix} ${item.num}</td><td style="font-size:14px;padding:6px 12px;border:1px solid #999;">${item.desc}</td></tr>`
+  ).join('');
+
+  return `<h1>${title}</h1><table style="width:100%;border-collapse:collapse;margin:1em 0;"><thead><tr><th style="font-size:14px;padding:6px 12px;border:1px solid #999;font-weight:bold;">${numHeader}</th><th style="font-size:14px;padding:6px 12px;border:1px solid #999;font-weight:bold;">${descHeader}</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 /** Strip markdown code fences from AI output */
