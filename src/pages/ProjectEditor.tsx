@@ -77,7 +77,10 @@ const ProjectEditor = () => {
 
   const handleGenerate = async () => {
     if (!project) return;
-    const apiKey = localStorage.getItem('openai_api_key');
+    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini') || 'openai';
+    const apiKey = provider === 'gemini'
+      ? localStorage.getItem('gemini_api_key')
+      : localStorage.getItem('openai_api_key');
     if (!apiKey) {
       toast({ title: t('apiKeyRequired'), variant: 'destructive' });
       return;
@@ -86,6 +89,7 @@ const ProjectEditor = () => {
     try {
       const content = await generateResearch({
         apiKey,
+        provider,
         project,
         lang: project.research_language as 'ar' | 'en',
         onProgress: (step, progress) => setGenerationState({ active: true, step, progress }),

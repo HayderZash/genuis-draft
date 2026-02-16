@@ -26,9 +26,11 @@ export const translations = {
   openProject: { ar: 'فتح', en: 'Open' },
 
   // Settings
-  apiKeyLabel: { ar: 'مفتاح OpenAI API', en: 'OpenAI API Key' },
-  apiKeyPlaceholder: { ar: 'أدخل مفتاح API الخاص بك...', en: 'Enter your API key...' },
-  apiKeySaved: { ar: 'تم حفظ المفتاح بنجاح', en: 'API key saved successfully' },
+  aiProvider: { ar: 'مزود الذكاء الاصطناعي', en: 'AI Provider' },
+  apiKeyLabel: { ar: 'مفتاح API', en: 'API Key' },
+  openaiApiKeyPlaceholder: { ar: 'أدخل مفتاح OpenAI API...', en: 'Enter your OpenAI API key...' },
+  geminiApiKeyPlaceholder: { ar: 'أدخل مفتاح Gemini API...', en: 'Enter your Gemini API key...' },
+  apiKeySaved: { ar: 'تم حفظ الإعدادات بنجاح', en: 'Settings saved successfully' },
   apiKeyRequired: { ar: 'يرجى إدخال مفتاح API في الإعدادات أولاً', en: 'Please enter your API key in Settings first' },
   save: { ar: 'حفظ', en: 'Save' },
   cancel: { ar: 'إلغاء', en: 'Cancel' },

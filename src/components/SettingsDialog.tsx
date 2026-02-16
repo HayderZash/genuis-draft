@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -14,17 +15,40 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const { t } = useLanguage();
+  const [provider, setProvider] = useState<'openai' | 'gemini'>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setApiKey(localStorage.getItem('openai_api_key') || '');
+      const savedProvider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini') || 'openai';
+      setProvider(savedProvider);
+      setApiKey(
+        savedProvider === 'gemini'
+          ? localStorage.getItem('gemini_api_key') || ''
+          : localStorage.getItem('openai_api_key') || ''
+      );
+      setShowKey(false);
     }
   }, [open]);
 
+  const handleProviderChange = (val: 'openai' | 'gemini') => {
+    setProvider(val);
+    setApiKey(
+      val === 'gemini'
+        ? localStorage.getItem('gemini_api_key') || ''
+        : localStorage.getItem('openai_api_key') || ''
+    );
+    setShowKey(false);
+  };
+
   const handleSave = () => {
-    localStorage.setItem('openai_api_key', apiKey);
+    localStorage.setItem('ai_provider', provider);
+    if (provider === 'gemini') {
+      localStorage.setItem('gemini_api_key', apiKey);
+    } else {
+      localStorage.setItem('openai_api_key', apiKey);
+    }
     toast({ title: t('apiKeySaved') });
     onOpenChange(false);
   };
@@ -37,13 +61,25 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label>{t('aiProvider')}</Label>
+            <Select value={provider} onValueChange={handleProviderChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="gemini">Google Gemini</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label>{t('apiKeyLabel')}</Label>
             <div className="relative">
               <Input
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={t('apiKeyPlaceholder')}
+                placeholder={provider === 'gemini' ? t('geminiApiKeyPlaceholder') : t('openaiApiKeyPlaceholder')}
                 className="pe-10"
               />
               <Button
