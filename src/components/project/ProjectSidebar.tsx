@@ -14,9 +14,11 @@ interface Props {
   onUpdate: (updates: Partial<ProjectData>) => void;
   onGenerate: () => void;
   generating: boolean;
+  onRegenerateChapter?: (index: number) => void;
+  regeneratingIndex?: number;
 }
 
-export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating }: Props) => {
+export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRegenerateChapter, regeneratingIndex }: Props) => {
   const { t } = useLanguage();
 
   const handleChapterCountChange = (val: string) => {
@@ -107,6 +109,8 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating }: Pr
         chapterPages={project.chapter_pages || project.chapters.map(() => 10)}
         onChange={(chapters) => onUpdate({ chapters })}
         onPageChange={handlePageChange}
+        onRegenerate={onRegenerateChapter}
+        regeneratingIndex={regeneratingIndex}
       />
 
       <Button onClick={onGenerate} disabled={generating || !project.title} className="w-full gap-2">

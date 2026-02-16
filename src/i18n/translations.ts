@@ -85,6 +85,8 @@ export const translations = {
   rtl: { ar: 'من اليمين لليسار', en: 'Right to Left (RTL)' },
   ltr: { ar: 'من اليسار لليمين', en: 'Left to Right (LTR)' },
   referenceCount: { ar: 'عدد المصادر', en: 'Number of References' },
+  regenerateChapter: { ar: 'إعادة توليد الفصل', en: 'Regenerate Chapter' },
+  regeneratingChapter: { ar: 'جاري إعادة توليد الفصل...', en: 'Regenerating chapter...' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
