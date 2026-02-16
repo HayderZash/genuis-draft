@@ -30,6 +30,9 @@ export interface ProjectData {
   chapter_pages: number[];
   text_direction: string;
   reference_count: number;
+  include_toc: boolean;
+  include_list_of_tables: boolean;
+  include_list_of_figures: boolean;
 }
 
 const ProjectEditor = () => {
@@ -65,6 +68,9 @@ const ProjectEditor = () => {
       chapter_pages: (data.chapter_pages as any) || [],
       text_direction: data.text_direction || 'rtl',
       reference_count: data.reference_count || 10,
+      include_toc: (data as any).include_toc ?? true,
+      include_list_of_tables: (data as any).include_list_of_tables ?? false,
+      include_list_of_figures: (data as any).include_list_of_figures ?? false,
     });
     setLoading(false);
   }, [id, navigate]);

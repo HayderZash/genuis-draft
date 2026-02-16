@@ -4,6 +4,7 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { EditorToolbar } from './EditorToolbar';
 import type { ProjectData } from '@/pages/ProjectEditor';
 
 interface Props {
@@ -20,6 +21,15 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
       return `<p style="text-align:center;color:#999;">${lang === 'ar' ? 'لم يتم توليد المحتوى بعد. استخدم الشريط الجانبي لتوليد البحث.' : 'No content generated yet. Use the sidebar to generate research.'}</p>`;
     }
     let html = '';
+    // Abstract
+    if (project.content['abstract']) {
+      html += project.content['abstract'];
+    }
+    // Table of contents sections
+    if (project.content['toc']) html += project.content['toc'];
+    if (project.content['list_of_tables']) html += project.content['list_of_tables'];
+    if (project.content['list_of_figures']) html += project.content['list_of_figures'];
+    // Chapters
     project.chapters.forEach((ch, i) => {
       const chContent = project.content[`chapter_${i}`] || '';
       html += chContent;
@@ -44,7 +54,6 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
       },
     },
     onUpdate: ({ editor }) => {
-      // Save the full HTML as a single content block for simplicity
       onContentChange({ ...project.content, _full: editor.getHTML() });
     },
   });
@@ -67,10 +76,12 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
         .research-editor h2 { font-size: 18px; font-weight: bold; margin: 1.2em 0 0.4em; }
         .research-editor h3 { font-size: 16px; font-weight: bold; text-decoration: underline; margin: 1em 0 0.3em; }
         .research-editor p { font-size: 14px; line-height: 1.8; margin: 0.5em 0; text-align: justify; }
+        .research-editor .figure-caption { font-size: 12px; font-style: italic; text-align: center; margin: 0.5em 0; }
         .research-editor { font-family: "Times New Roman", Times, serif; }
         .ProseMirror { min-height: 60vh; }
         .ProseMirror:focus { outline: none; }
       `}</style>
+      <EditorToolbar editor={editor} />
       <EditorContent editor={editor} />
     </div>
   );
