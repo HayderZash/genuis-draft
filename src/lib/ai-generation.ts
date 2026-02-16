@@ -24,7 +24,7 @@ async function callAI(
   if (provider === 'gemini') {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const maxRetries = 3;
-    const initialDelay = 30000;
+    const initialDelay = 5000;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -55,8 +55,11 @@ async function callAI(
         }
 
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
+          const errText = await response.text().catch(() => '');
+          console.error(`Gemini API error: status=${response.status}, body=${errText}`);
+          let errMsg = `Gemini API error: ${response.status}`;
+          try { errMsg = JSON.parse(errText)?.error?.message || errMsg; } catch {}
+          throw new Error(errMsg);
         }
 
         const data = await response.json();
