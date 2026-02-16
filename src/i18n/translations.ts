@@ -79,6 +79,12 @@ export const translations = {
   downloadWord: { ar: 'تحميل Word (.docx)', en: 'Download Word (.docx)' },
   cm: { ar: 'سم', en: 'cm' },
   backToDashboard: { ar: 'العودة للوحة التحكم', en: 'Back to Dashboard' },
+  pagesPerChapter: { ar: 'عدد الصفحات لكل فصل', en: 'Pages per Chapter' },
+  pages: { ar: 'صفحة', en: 'pages' },
+  textDirection: { ar: 'اتجاه النص', en: 'Text Direction' },
+  rtl: { ar: 'من اليمين لليسار', en: 'Right to Left (RTL)' },
+  ltr: { ar: 'من اليسار لليمين', en: 'Left to Right (LTR)' },
+  referenceCount: { ar: 'عدد المصادر', en: 'Number of References' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

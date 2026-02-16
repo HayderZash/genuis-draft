@@ -27,6 +27,9 @@ export interface ProjectData {
   margin_bottom: number;
   margin_left: number;
   margin_right: number;
+  chapter_pages: number[];
+  text_direction: string;
+  reference_count: number;
 }
 
 const ProjectEditor = () => {
@@ -58,6 +61,9 @@ const ProjectEditor = () => {
       ...data,
       chapters: (data.chapters as any) || [],
       content: (data.content as any) || {},
+      chapter_pages: (data.chapter_pages as any) || [],
+      text_direction: data.text_direction || 'rtl',
+      reference_count: data.reference_count || 10,
     });
     setLoading(false);
   }, [id, navigate]);
@@ -68,10 +74,11 @@ const ProjectEditor = () => {
     if (!project) return;
     const newProject = { ...project, ...updates };
     setProject(newProject);
-    const { chapters, content, ...rest } = updates;
+    const { chapters, content, chapter_pages, ...rest } = updates;
     const dbUpdates: any = { ...rest };
     if (chapters !== undefined) dbUpdates.chapters = chapters;
     if (content !== undefined) dbUpdates.content = content;
+    if (chapter_pages !== undefined) dbUpdates.chapter_pages = chapter_pages;
     await supabase.from('research_projects').update(dbUpdates).eq('id', project.id);
   }, [project]);
 
