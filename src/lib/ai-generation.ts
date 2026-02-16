@@ -21,14 +21,14 @@ async function callAI(
   temperature: number
 ): Promise<string> {
   if (provider === 'gemini') {
+    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
           generationConfig: { maxOutputTokens: maxTokens, temperature },
         }),
       }
