@@ -21,13 +21,19 @@ interface Chapter {
 interface Props {
   chapters: Chapter[];
   chapterCount: number;
+  chapterPages: number[];
   onChange: (chapters: Chapter[]) => void;
+  onPageChange: (index: number, pages: number) => void;
 }
 
-const SortableChapter = ({ chapter, index, onRename, onDelete, locked }: {
-  chapter: Chapter; index: number; onRename: (i: number, name: string, nameAr: string) => void;
-  onDelete: (i: number) => void; locked: boolean;
+const SortableChapter = ({ chapter, index, pages, onRename, onDelete, onPageChange, locked }: {
+  chapter: Chapter; index: number; pages: number;
+  onRename: (i: number, name: string, nameAr: string) => void;
+  onDelete: (i: number) => void;
+  onPageChange: (i: number, pages: number) => void;
+  locked: boolean;
 }) => {
+  const { t } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: `ch-${index}` });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
@@ -44,7 +50,16 @@ const SortableChapter = ({ chapter, index, onRename, onDelete, locked }: {
         value={chapter.name}
         onChange={(e) => onRename(index, e.target.value, chapter.nameAr)}
         disabled={locked}
-        className="h-8 text-sm"
+        className="h-8 text-sm flex-1"
+      />
+      <Input
+        type="number"
+        min={1}
+        max={50}
+        value={pages}
+        onChange={(e) => onPageChange(index, parseInt(e.target.value) || 5)}
+        className="h-8 text-sm w-16"
+        title={t('pagesPerChapter')}
       />
       {!locked && (
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onDelete(index)}>
@@ -55,7 +70,7 @@ const SortableChapter = ({ chapter, index, onRename, onDelete, locked }: {
   );
 };
 
-export const ChapterList = ({ chapters, chapterCount, onChange }: Props) => {
+export const ChapterList = ({ chapters, chapterCount, chapterPages, onChange, onPageChange }: Props) => {
   const { t } = useLanguage();
   const locked = chapterCount === 5;
   const sensors = useSensors(
@@ -90,7 +105,10 @@ export const ChapterList = ({ chapters, chapterCount, onChange }: Props) => {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>{t('chapters')}</Label>
-        {locked && <Badge variant="secondary" className="text-xs">{t('lockedStructure')}</Badge>}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t('pages')}</span>
+          {locked && <Badge variant="secondary" className="text-xs">{t('lockedStructure')}</Badge>}
+        </div>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={chapters.map((_, i) => `ch-${i}`)} strategy={verticalListSortingStrategy}>
@@ -100,8 +118,10 @@ export const ChapterList = ({ chapters, chapterCount, onChange }: Props) => {
                 key={`ch-${i}`}
                 chapter={ch}
                 index={i}
+                pages={chapterPages[i] || 10}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                onPageChange={onPageChange}
                 locked={locked}
               />
             ))}

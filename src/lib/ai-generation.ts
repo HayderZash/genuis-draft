@@ -10,7 +10,8 @@ interface GenerateParams {
   t: (key: TranslationKey) => string;
 }
 
-const WORD_TARGETS = [1200, 1800, 1800, 1200, 900, 900];
+const DEFAULT_WORD_TARGETS = [1200, 1800, 1800, 1200, 900, 900];
+const WORDS_PER_PAGE = 250;
 
 async function callAI(
   provider: 'openai' | 'gemini',
@@ -108,15 +109,18 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
     const baseProgress = 10 + (i / totalChapters) * 75;
     onProgress(progressStep, baseProgress);
 
-    const wordTarget = WORD_TARGETS[i] || 1200;
+    const chapterPages = project.chapter_pages?.[i];
+    const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : (DEFAULT_WORD_TARGETS[i] || 1200);
     const isLast = i === totalChapters - 1;
+    const chapterNum = i + 1;
     const refsInstruction = project.custom_references
       ? `\nUse these references where relevant: ${project.custom_references}`
       : '';
+    const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
     const systemPrompt = lang === 'ar'
-      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. أضف [الشكل X: الوصف] بين الفقرات حيث يناسب.`
-      : `You are a strict academic expert. Write in formal academic style in English. Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. Insert [Figure X: Description] between paragraphs where appropriate.`;
+      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. أضف [الشكل ${chapterNum}.X: الوصف] بين الفقرات حيث يناسب (حيث X هو رقم تسلسلي داخل الفصل).`
+      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. Insert [Figure ${chapterNum}.X: Description] between paragraphs where appropriate (X is sequential within the chapter).`;
 
     const userPrompt = lang === 'ar'
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
@@ -128,10 +132,11 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
 
   // Generate references
   onProgress(t('formattingCitations'), 90);
+  const refCount = project.reference_count || 10;
   const refsSystemPrompt = lang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML.' : 'You are an academic expert. Write in HTML format.';
   const refsPrompt = lang === 'ar'
-    ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع بتنسيق APA. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
-    : `Based on a research paper titled "${project.title}" about "${project.abstract}", write an APA-style reference list. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
+    ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع تحتوي على ${refCount} مصدر بتنسيق APA. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
+    : `Based on a research paper titled "${project.title}" about "${project.abstract}", write an APA-style reference list with exactly ${refCount} references. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
 
   content['references'] = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
 

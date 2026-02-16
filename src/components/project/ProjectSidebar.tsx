@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChapterList } from './ChapterList';
 import { Loader2, Sparkles } from 'lucide-react';
+import { getDefaultChapters } from '@/pages/Dashboard';
 import type { ProjectData } from '@/pages/ProjectEditor';
 
 interface Props {
@@ -20,8 +21,15 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating }: Pr
 
   const handleChapterCountChange = (val: string) => {
     const count = parseInt(val);
-    const { getDefaultChapters } = require('@/pages/Dashboard');
-    onUpdate({ chapter_count: count, chapters: getDefaultChapters(count) });
+    const newChapters = getDefaultChapters(count);
+    const newPages = newChapters.map((_, i) => project.chapter_pages?.[i] || 10);
+    onUpdate({ chapter_count: count, chapters: newChapters, chapter_pages: newPages });
+  };
+
+  const handlePageChange = (index: number, pages: number) => {
+    const updated = [...(project.chapter_pages || project.chapters.map(() => 10))];
+    updated[index] = pages;
+    onUpdate({ chapter_pages: updated });
   };
 
   return (
@@ -50,12 +58,34 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating }: Pr
       </div>
 
       <div className="space-y-2">
+        <Label>{t('textDirection')}</Label>
+        <Select value={project.text_direction || 'rtl'} onValueChange={(v) => onUpdate({ text_direction: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="rtl">{t('rtl')}</SelectItem>
+            <SelectItem value="ltr">{t('ltr')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
         <Label>{t('customReferences')}</Label>
         <Textarea
           value={project.custom_references}
           onChange={(e) => onUpdate({ custom_references: e.target.value })}
           placeholder={t('customReferencesPlaceholder')}
           rows={3}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t('referenceCount')}</Label>
+        <Input
+          type="number"
+          min={1}
+          max={50}
+          value={project.reference_count || 10}
+          onChange={(e) => onUpdate({ reference_count: parseInt(e.target.value) || 10 })}
         />
       </div>
 
@@ -74,7 +104,9 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating }: Pr
       <ChapterList
         chapters={project.chapters}
         chapterCount={project.chapter_count}
+        chapterPages={project.chapter_pages || project.chapters.map(() => 10)}
         onChange={(chapters) => onUpdate({ chapters })}
+        onPageChange={handlePageChange}
       />
 
       <Button onClick={onGenerate} disabled={generating || !project.title} className="w-full gap-2">

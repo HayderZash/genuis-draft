@@ -45,6 +45,7 @@ export type Database = {
         Row: {
           abstract: string | null
           chapter_count: number
+          chapter_pages: Json | null
           chapters: Json
           content: Json | null
           created_at: string
@@ -54,8 +55,10 @@ export type Database = {
           margin_left: number
           margin_right: number
           margin_top: number
+          reference_count: number
           research_language: string
           status: string
+          text_direction: string
           title: string
           updated_at: string
           user_id: string
@@ -63,6 +66,7 @@ export type Database = {
         Insert: {
           abstract?: string | null
           chapter_count?: number
+          chapter_pages?: Json | null
           chapters?: Json
           content?: Json | null
           created_at?: string
@@ -72,8 +76,10 @@ export type Database = {
           margin_left?: number
           margin_right?: number
           margin_top?: number
+          reference_count?: number
           research_language?: string
           status?: string
+          text_direction?: string
           title?: string
           updated_at?: string
           user_id: string
@@ -81,6 +87,7 @@ export type Database = {
         Update: {
           abstract?: string | null
           chapter_count?: number
+          chapter_pages?: Json | null
           chapters?: Json
           content?: Json | null
           created_at?: string
@@ -90,8 +97,10 @@ export type Database = {
           margin_left?: number
           margin_right?: number
           margin_top?: number
+          reference_count?: number
           research_language?: string
           status?: string
+          text_direction?: string
           title?: string
           updated_at?: string
           user_id?: string

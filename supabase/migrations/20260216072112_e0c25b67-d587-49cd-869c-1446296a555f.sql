@@ -1,0 +1,5 @@
+
+ALTER TABLE public.research_projects 
+ADD COLUMN IF NOT EXISTS chapter_pages JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS text_direction TEXT NOT NULL DEFAULT 'rtl',
+ADD COLUMN IF NOT EXISTS reference_count INTEGER NOT NULL DEFAULT 10;
