@@ -141,9 +141,13 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
       ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. لا تستخدم أي إشارات مرجعية أو أرقام مصادر مثل [1] أو [2] داخل النص نهائياً. اكتب النص الأكاديمي فقط بدون أي إشارات للمصادر.'
       : 'Do NOT include a references or bibliography section at the end of this chapter. Do NOT use any in-text citations or reference numbers like [1], [2] anywhere in the text. Write pure academic text without any source references.';
 
+    const numberingInstruction = researchLang === 'ar'
+      ? `رقّم الفصل والعناوين بشكل منهجي: عنوان الفصل يكون "الفصل ${chapterNum}: ${chapterName}" بتنسيق <h1>، العناوين الرئيسية تُرقّم ${chapterNum}.1، ${chapterNum}.2، إلخ بتنسيق <h2>، والعناوين الفرعية تُرقّم ${chapterNum}.1.1، ${chapterNum}.1.2، إلخ بتنسيق <h3>.`
+      : `Number the chapter and headings systematically: chapter title as "Chapter ${chapterNum}: ${chapterName}" in <h1>, main headings numbered ${chapterNum}.1, ${chapterNum}.2, etc. in <h2>, subheadings numbered ${chapterNum}.1.1, ${chapterNum}.1.2, etc. in <h3>.`;
+
     const systemPrompt = researchLang === 'ar'
-      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
-      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${noRefsInChapter}`;
+      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML. ${numberingInstruction} والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
+      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. ${numberingInstruction} Body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
     const userPrompt = researchLang === 'ar'
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
@@ -204,9 +208,13 @@ export async function regenerateChapter({ apiKey, provider, project, lang, chapt
     ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. لا تستخدم أي إشارات مرجعية أو أرقام مصادر مثل [1] أو [2] داخل النص نهائياً. اكتب النص الأكاديمي فقط بدون أي إشارات للمصادر.'
     : 'Do NOT include a references or bibliography section at the end of this chapter. Do NOT use any in-text citations or reference numbers like [1], [2] anywhere in the text. Write pure academic text without any source references.';
 
+  const numberingInstruction = researchLang === 'ar'
+    ? `رقّم الفصل والعناوين بشكل منهجي: عنوان الفصل يكون "الفصل ${chapterNum}: ${chapterName}" بتنسيق <h1>، العناوين الرئيسية تُرقّم ${chapterNum}.1، ${chapterNum}.2، إلخ بتنسيق <h2>، والعناوين الفرعية تُرقّم ${chapterNum}.1.1، ${chapterNum}.1.2، إلخ بتنسيق <h3>.`
+    : `Number the chapter and headings systematically: chapter title as "Chapter ${chapterNum}: ${chapterName}" in <h1>, main headings numbered ${chapterNum}.1, ${chapterNum}.2, etc. in <h2>, subheadings numbered ${chapterNum}.1.1, ${chapterNum}.1.2, etc. in <h3>.`;
+
   const systemPrompt = researchLang === 'ar'
-    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
-    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${noRefsInChapter}`;
+    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML. ${numberingInstruction} والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
+    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. ${numberingInstruction} Body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
   const userPrompt = researchLang === 'ar'
     ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
