@@ -130,13 +130,17 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
       : '';
     const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
+    const figureInstruction = researchLang === 'ar'
+      ? `أضف عناوين الأشكال بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p> (حيث X رقم تسلسلي). عنوان الشكل يكون مائلاً وبحجم 12.`
+      : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p> (X is sequential). Figure captions must be italic and 12px size.`;
+
     const noRefsInChapter = researchLang === 'ar'
-      ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. لا تستخدم أي إشارات مرجعية أو أرقام مصادر مثل [1] أو [2] داخل النص نهائياً. لا تضف عناوين أشكال أو جداول. اكتب النص الأكاديمي فقط بدون أي إشارات للمصادر.'
-      : 'Do NOT include a references or bibliography section at the end of this chapter. Do NOT use any in-text citations or reference numbers like [1], [2] anywhere in the text. Do NOT add figure or table captions. Write pure academic text without any source references.';
+      ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. لا تستخدم أي إشارات مرجعية أو أرقام مصادر مثل [1] أو [2] داخل النص نهائياً. اكتب النص الأكاديمي فقط بدون أي إشارات للمصادر.'
+      : 'Do NOT include a references or bibliography section at the end of this chapter. Do NOT use any in-text citations or reference numbers like [1], [2] anywhere in the text. Write pure academic text without any source references.';
 
     const systemPrompt = researchLang === 'ar'
-      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${noRefsInChapter}`
-      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${noRefsInChapter}`;
+      ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
+      : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
     const userPrompt = researchLang === 'ar'
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
@@ -189,13 +193,17 @@ export async function regenerateChapter({ apiKey, provider, project, lang, chapt
   const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
   const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
+  const figureInstruction = researchLang === 'ar'
+    ? `أضف عناوين الأشكال بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p> (حيث X رقم تسلسلي). عنوان الشكل يكون مائلاً وبحجم 12.`
+    : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p> (X is sequential). Figure captions must be italic and 12px size.`;
+
   const noRefsInChapter = researchLang === 'ar'
-    ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. لا تستخدم أي إشارات مرجعية أو أرقام مصادر مثل [1] أو [2] داخل النص نهائياً. لا تضف عناوين أشكال أو جداول. اكتب النص الأكاديمي فقط بدون أي إشارات للمصادر.'
-    : 'Do NOT include a references or bibliography section at the end of this chapter. Do NOT use any in-text citations or reference numbers like [1], [2] anywhere in the text. Do NOT add figure or table captions. Write pure academic text without any source references.';
+    ? 'لا تكتب قائمة المصادر أو المراجع في نهاية الفصل. لا تستخدم أي إشارات مرجعية أو أرقام مصادر مثل [1] أو [2] داخل النص نهائياً. اكتب النص الأكاديمي فقط بدون أي إشارات للمصادر.'
+    : 'Do NOT include a references or bibliography section at the end of this chapter. Do NOT use any in-text citations or reference numbers like [1], [2] anywhere in the text. Write pure academic text without any source references.';
 
   const systemPrompt = researchLang === 'ar'
-    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${noRefsInChapter}`
-    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${noRefsInChapter}`;
+    ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML مع العناوين. عنوان الفصل يكون <h1>، العناوين الرئيسية <h2>، العناوين الفرعية <h3>، والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
+    : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. Chapter title as <h1>, main headings as <h2>, subheadings as <h3>, body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
   const userPrompt = researchLang === 'ar'
     ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
