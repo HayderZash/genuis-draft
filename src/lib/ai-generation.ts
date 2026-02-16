@@ -22,23 +22,41 @@ async function callAI(
 ): Promise<string> {
   if (provider === 'gemini') {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature },
-        }),
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 5000 * attempt));
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
+            generationConfig: { maxOutputTokens: maxTokens, temperature },
+          }),
+        }
+      );
+
+      if (response.status === 429) {
+        lastError = new Error('Rate limit exceeded, retrying...');
+        continue;
       }
-    );
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // Add delay between successful requests to avoid rate limits
+      await new Promise(r => setTimeout(r, 1500));
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    throw lastError || new Error('Gemini API failed after retries');
   }
 
   // OpenAI
