@@ -3,6 +3,7 @@ import type { TranslationKey } from '@/i18n/translations';
 
 interface GenerateParams {
   apiKey: string;
+  provider: 'openai' | 'gemini';
   project: ProjectData;
   lang: 'ar' | 'en';
   onProgress: (step: string, progress: number) => void;
@@ -11,7 +12,61 @@ interface GenerateParams {
 
 const WORD_TARGETS = [1200, 1800, 1800, 1200, 900, 900];
 
-export async function generateResearch({ apiKey, project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
+async function callAI(
+  provider: 'openai' | 'gemini',
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number,
+  temperature: number
+): Promise<string> {
+  if (provider === 'gemini') {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: { maxOutputTokens: maxTokens, temperature },
+        }),
+      }
+    );
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `Gemini API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  // OpenAI
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: maxTokens,
+      temperature,
+    }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `API error: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.choices[0]?.message?.content || '';
+}
+
+export async function generateResearch({ apiKey, provider, project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
   const content: Record<string, string> = {};
   const totalChapters = project.chapters.length;
 
@@ -37,57 +92,18 @@ export async function generateResearch({ apiKey, project, lang, onProgress, t }:
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
       : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 4000,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error?.message || `API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    content[`chapter_${i}`] = data.choices[0]?.message?.content || '';
+    content[`chapter_${i}`] = await callAI(provider, apiKey, systemPrompt, userPrompt, 4000, 0.7);
     onProgress(progressStep, baseProgress + (75 / totalChapters) * 0.8);
   }
 
   // Generate references
   onProgress(t('formattingCitations'), 90);
+  const refsSystemPrompt = lang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML.' : 'You are an academic expert. Write in HTML format.';
   const refsPrompt = lang === 'ar'
     ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع بتنسيق APA. استخدم تنسيق HTML مع <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تأكد من تضمين هذه المراجع: ${project.custom_references}` : ''}`
     : `Based on a research paper titled "${project.title}" about "${project.abstract}", write an APA-style reference list. Use HTML with <h1> for the title and <p> for each reference. ${project.custom_references ? `Make sure to include: ${project.custom_references}` : ''}`;
 
-  const refsResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: lang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML.' : 'You are an academic expert. Write in HTML format.' },
-        { role: 'user', content: refsPrompt },
-      ],
-      max_tokens: 2000,
-      temperature: 0.5,
-    }),
-  });
-
-  if (refsResponse.ok) {
-    const refsData = await refsResponse.json();
-    content['references'] = refsData.choices[0]?.message?.content || '';
-  }
+  content['references'] = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
 
   onProgress(t('finalizing'), 98);
   return content;
