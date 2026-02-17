@@ -563,12 +563,13 @@ const CVBuilder = () => {
                   dir={previewCV.generated_content?.includes('ال') ? 'rtl' : 'ltr'}
                 />
               ) : (
-                <div
-                  className="prose max-w-none font-serif"
-                  style={{ fontFamily: "'Times New Roman', Times, serif", textAlign: 'justify' }}
-                  dir={editingContent.includes('ال') ? 'rtl' : 'ltr'}
-                  dangerouslySetInnerHTML={{ __html: editingContent }}
-                />
+                <div className="border-2 border-border rounded-lg p-8 bg-card shadow-inner mx-auto max-w-[800px]">
+                  <div
+                    className="generated-content prose max-w-none"
+                    dir={editingContent.includes('ال') ? 'rtl' : 'ltr'}
+                    dangerouslySetInnerHTML={{ __html: editingContent }}
+                  />
+                </div>
               )}
             </div>
           </div>

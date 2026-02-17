@@ -2,7 +2,7 @@ export type Lang = 'ar' | 'en';
 
 export const translations = {
   // Nav & General
-  appName: { ar: 'منصة البحث الأكاديمي', en: 'Academic Research Platform' },
+  appName: { ar: 'منصة المساعد الأكاديمي', en: 'Academic Assistant Platform' },
   dashboard: { ar: 'لوحة التحكم', en: 'Dashboard' },
   settings: { ar: 'الإعدادات', en: 'Settings' },
   logout: { ar: 'تسجيل الخروج', en: 'Logout' },
@@ -35,6 +35,14 @@ export const translations = {
   createReportDesc: { ar: 'إنشاء تقارير علمية أو مختبرية', en: 'Create scientific or laboratory reports' },
   createCV: { ar: 'إنشاء سيرة ذاتية', en: 'Create CV' },
   createCVDesc: { ar: 'إنشاء سيرة ذاتية احترافية بنظام ATS', en: 'Create a professional ATS-compatible CV' },
+  summarizeText: { ar: 'تلخيص النصوص', en: 'Text Summarizer' },
+  summarizeTextDesc: { ar: 'تلخيص النصوص الطويلة بالذكاء الاصطناعي', en: 'AI-powered summarization of long texts' },
+  academicTranslation: { ar: 'الترجمة الأكاديمية', en: 'Academic Translation' },
+  academicTranslationDesc: { ar: 'ترجمة نصوص أكاديمية بين العربية والإنجليزية', en: 'Translate academic texts between Arabic and English' },
+  presentationGenerator: { ar: 'توليد عروض تقديمية', en: 'Presentation Generator' },
+  presentationGeneratorDesc: { ar: 'إنشاء عروض PowerPoint من البحوث تلقائياً', en: 'Auto-generate PowerPoint presentations from research' },
+  plagiarismChecker: { ar: 'كشف الانتحال', en: 'Plagiarism Checker' },
+  plagiarismCheckerDesc: { ar: 'فحص النصوص للتأكد من أصالتها', en: 'Check texts for originality and plagiarism' },
 
   // Settings
   aiProvider: { ar: 'مزود الذكاء الاصطناعي', en: 'AI Provider' },

@@ -125,7 +125,7 @@ const Proofreading = () => {
             <Card>
               <CardHeader><CardTitle>{t('correctedText')}</CardTitle></CardHeader>
               <CardContent>
-                <div className="p-4 bg-muted rounded-md whitespace-pre-wrap" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                <div className="p-4 bg-muted rounded-md whitespace-pre-wrap generated-content" dir={language === 'ar' ? 'rtl' : 'ltr'}>
                   {result.corrected}
                 </div>
               </CardContent>
