@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller is admin
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -31,7 +30,6 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check admin role
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -44,105 +42,171 @@ Deno.serve(async (req) => {
     }
 
     const { action, ...body } = await req.json();
+    const json = (data: any, status = 200) =>
+      new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    // ── LIST USERS ──
     if (action === "list-users") {
-      const { data: profiles } = await adminClient
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      // Get roles for all users
+      const { data: profiles } = await adminClient.from("profiles").select("*").order("created_at", { ascending: false });
       const { data: roles } = await adminClient.from("user_roles").select("*");
-
-      // Get auth users for email
+      const { data: featureAccess } = await adminClient.from("user_feature_access").select("*");
+      const { data: featurePoints } = await adminClient.from("user_feature_points").select("*");
       const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
 
       const enriched = (profiles || []).map((p: any) => {
         const authUser = authUsers?.find((u: any) => u.id === p.user_id);
         const userRoles = (roles || []).filter((r: any) => r.user_id === p.user_id);
+        const userFA: Record<string, boolean> = {};
+        (featureAccess || []).filter((f: any) => f.user_id === p.user_id).forEach((f: any) => { userFA[f.feature] = f.is_enabled; });
+        const userFP: Record<string, any> = {};
+        (featurePoints || []).filter((f: any) => f.user_id === p.user_id).forEach((f: any) => { userFP[f.feature] = { points: f.points_remaining, expires_at: f.expires_at }; });
+
         return {
           ...p,
           email: authUser?.email || "",
           roles: userRoles.map((r: any) => r.role),
+          feature_access: userFA,
+          feature_points: userFP,
         };
       });
 
-      return new Response(JSON.stringify({ users: enriched }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ users: enriched });
     }
 
+    // ── CREATE USER ──
     if (action === "create-user") {
-      const { email, password, displayName, phone, durationDays, durationHours } = body;
-      
+      const { email, password, displayName, phone, durationDays, durationHours, accountType, featureAccess, featurePoints, pointsExpiresAt } = body;
+
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + (durationDays || 30));
       expiresAt.setHours(expiresAt.getHours() + (durationHours || 0));
 
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
+        email, password, email_confirm: true,
         user_metadata: { display_name: displayName },
       });
+      if (createError) return json({ error: createError.message }, 400);
 
-      if (createError) {
-        return new Response(JSON.stringify({ error: createError.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const userId = newUser.user.id;
+
+      await adminClient.from("profiles").update({
+        phone, expires_at: expiresAt.toISOString(), display_name: displayName,
+        account_type: accountType || 'unlimited',
+      }).eq("user_id", userId);
+
+      // Set feature access
+      if (featureAccess) {
+        const rows = Object.entries(featureAccess).map(([feature, enabled]) => ({
+          user_id: userId, feature, is_enabled: enabled as boolean,
+        }));
+        await adminClient.from("user_feature_access").upsert(rows, { onConflict: "user_id,feature" });
       }
 
-      // Update profile with phone and expiry
-      await adminClient
-        .from("profiles")
-        .update({ phone, expires_at: expiresAt.toISOString(), display_name: displayName })
-        .eq("user_id", newUser.user.id);
+      // Set feature points
+      if (accountType === 'points' && featurePoints) {
+        const rows = Object.entries(featurePoints).map(([feature, points]) => ({
+          user_id: userId, feature, points_remaining: points as number,
+          expires_at: pointsExpiresAt ? new Date(pointsExpiresAt).toISOString() : null,
+        }));
+        await adminClient.from("user_feature_points").upsert(rows, { onConflict: "user_id,feature" });
+      }
 
-      return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ success: true, user_id: userId });
     }
 
+    // ── UPDATE USER ──
+    if (action === "update-user") {
+      const { userId, displayName, phone, accountType, featureAccess, featurePoints, pointsExpiresAt } = body;
+
+      await adminClient.from("profiles").update({
+        display_name: displayName, phone, account_type: accountType || 'unlimited',
+      }).eq("user_id", userId);
+
+      if (featureAccess) {
+        const rows = Object.entries(featureAccess).map(([feature, enabled]) => ({
+          user_id: userId, feature, is_enabled: enabled as boolean,
+        }));
+        await adminClient.from("user_feature_access").upsert(rows, { onConflict: "user_id,feature" });
+      }
+
+      if (accountType === 'points' && featurePoints) {
+        const rows = Object.entries(featurePoints).map(([feature, points]) => ({
+          user_id: userId, feature, points_remaining: points as number,
+          expires_at: pointsExpiresAt ? new Date(pointsExpiresAt).toISOString() : null,
+        }));
+        await adminClient.from("user_feature_points").upsert(rows, { onConflict: "user_id,feature" });
+      }
+
+      return json({ success: true });
+    }
+
+    // ── TOGGLE ACTIVE ──
     if (action === "toggle-active") {
       const { userId, isActive } = body;
       await adminClient.from("profiles").update({ is_active: isActive }).eq("user_id", userId);
-      
       if (!isActive) {
-        // Ban the user in auth
-        await adminClient.auth.admin.updateUserById(userId, { ban_duration: "876000h" }); // ~100 years
+        await adminClient.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
       } else {
         await adminClient.auth.admin.updateUserById(userId, { ban_duration: "none" });
       }
-
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ success: true });
     }
 
+    // ── EXTEND DURATION ──
     if (action === "extend-duration") {
       const { userId, days, hours } = body;
-      
-      // Get current expiry
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("expires_at")
-        .eq("user_id", userId)
-        .single();
-
+      const { data: profile } = await adminClient.from("profiles").select("expires_at").eq("user_id", userId).single();
       const baseDate = profile?.expires_at ? new Date(profile.expires_at) : new Date();
       const now = new Date();
       const startFrom = baseDate > now ? baseDate : now;
-      
       startFrom.setDate(startFrom.getDate() + (days || 0));
       startFrom.setHours(startFrom.getHours() + (hours || 0));
-
-      await adminClient
-        .from("profiles")
-        .update({ expires_at: startFrom.toISOString() })
-        .eq("user_id", userId);
-
-      return new Response(JSON.stringify({ success: true, new_expires_at: startFrom.toISOString() }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      await adminClient.from("profiles").update({ expires_at: startFrom.toISOString() }).eq("user_id", userId);
+      return json({ success: true, new_expires_at: startFrom.toISOString() });
     }
 
+    // ── DELETE USER ──
     if (action === "delete-user") {
       const { userId } = body;
       await adminClient.auth.admin.deleteUser(userId);
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ success: true });
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // ── UPDATE SETTINGS ──
+    if (action === "update-settings") {
+      const { settings } = body;
+      for (const s of settings) {
+        await adminClient.from("platform_settings").update({ value: s.value, updated_at: new Date().toISOString() }).eq("key", s.key);
+      }
+      return json({ success: true });
+    }
+
+    // ── CONSUME POINTS ──
+    if (action === "consume-points") {
+      const { userId, feature, cost } = body;
+      
+      // Check account type
+      const { data: profile } = await adminClient.from("profiles").select("account_type").eq("user_id", userId).single();
+      if (!profile || profile.account_type !== 'points') return json({ allowed: true });
+
+      // Check feature access
+      const { data: access } = await adminClient.from("user_feature_access").select("is_enabled").eq("user_id", userId).eq("feature", feature).single();
+      if (access && !access.is_enabled) return json({ allowed: false, error: "Feature disabled" });
+
+      if (cost === 0) return json({ allowed: true });
+
+      // Check points
+      const { data: pts } = await adminClient.from("user_feature_points").select("*").eq("user_id", userId).eq("feature", feature).single();
+      if (!pts) return json({ allowed: false, error: "No points allocated" });
+      if (pts.expires_at && new Date(pts.expires_at) < new Date()) return json({ allowed: false, error: "Points expired" });
+      if (pts.points_remaining < cost) return json({ allowed: false, error: "Insufficient points" });
+
+      // Deduct
+      await adminClient.from("user_feature_points").update({ points_remaining: pts.points_remaining - cost }).eq("id", pts.id);
+      return json({ allowed: true, remaining: pts.points_remaining - cost });
+    }
+
+    return json({ error: "Unknown action" }, 400);
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }

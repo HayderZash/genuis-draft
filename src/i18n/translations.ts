@@ -41,8 +41,8 @@ export const translations = {
   academicTranslationDesc: { ar: 'ترجمة نصوص أكاديمية بين العربية والإنجليزية', en: 'Translate academic texts between Arabic and English' },
   presentationGenerator: { ar: 'توليد عروض تقديمية', en: 'Presentation Generator' },
   presentationGeneratorDesc: { ar: 'إنشاء عروض PowerPoint من البحوث تلقائياً', en: 'Auto-generate PowerPoint presentations from research' },
-  plagiarismChecker: { ar: 'كشف الانتحال', en: 'Plagiarism Checker' },
-  plagiarismCheckerDesc: { ar: 'فحص النصوص للتأكد من أصالتها', en: 'Check texts for originality and plagiarism' },
+  plagiarismChecker: { ar: 'كشف نسبة الاستلال', en: 'Plagiarism Detection' },
+  plagiarismCheckerDesc: { ar: 'فحص النصوص والتأكد من أصالتها ونسبة التطابق', en: 'Check texts for originality and similarity percentage' },
 
   // Settings
   aiProvider: { ar: 'مزود الذكاء الاصطناعي', en: 'AI Provider' },

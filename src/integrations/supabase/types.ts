@@ -89,8 +89,30 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          account_type: string
           created_at: string
           display_name: string | null
           expires_at: string | null
@@ -102,6 +124,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_type?: string
           created_at?: string
           display_name?: string | null
           expires_at?: string | null
@@ -113,6 +136,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_type?: string
           created_at?: string
           display_name?: string | null
           expires_at?: string | null
@@ -262,6 +286,54 @@ export type Database = {
           text_direction?: string
           title?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_feature_access: {
+        Row: {
+          feature: string
+          id: string
+          is_enabled: boolean
+          user_id: string
+        }
+        Insert: {
+          feature: string
+          id?: string
+          is_enabled?: boolean
+          user_id: string
+        }
+        Update: {
+          feature?: string
+          id?: string
+          is_enabled?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_feature_points: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          feature: string
+          id: string
+          points_remaining: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          feature: string
+          id?: string
+          points_remaining?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          feature?: string
+          id?: string
+          points_remaining?: number
           user_id?: string
         }
         Relationships: []
