@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldCheck, AlertTriangle, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,7 +25,43 @@ const PlagiarismChecker = () => {
   const [text, setText] = useState('');
   const [language, setLanguage] = useState<string>('ar');
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<PlagiarismResult | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'txt' || ext === 'md') {
+      const content = await file.text();
+      setText(content);
+      return;
+    }
+
+    // For PDF/DOCX, we read as text (basic extraction)
+    if (ext === 'pdf' || ext === 'docx' || ext === 'doc') {
+      setUploading(true);
+      try {
+        const content = await file.text();
+        // Try to extract readable text
+        const cleaned = content.replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FFa-zA-Z0-9\s.,;:!?()[\]{}\-'"]/g, ' ')
+          .replace(/\s+/g, ' ').trim();
+        if (cleaned.length > 50) {
+          setText(cleaned);
+        } else {
+          toast({ title: lang === 'ar' ? 'لم نتمكن من استخراج النص. يرجى لصق النص يدوياً' : 'Could not extract text. Please paste it manually.', variant: 'destructive' });
+        }
+      } catch {
+        toast({ title: lang === 'ar' ? 'خطأ في قراءة الملف' : 'Error reading file', variant: 'destructive' });
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      toast({ title: lang === 'ar' ? 'يرجى رفع ملف TXT أو PDF أو Word' : 'Please upload a TXT, PDF, or Word file', variant: 'destructive' });
+    }
+    e.target.value = '';
+  };
 
   const handleCheck = async () => {
     if (!text.trim()) {
@@ -90,15 +126,27 @@ const PlagiarismChecker = () => {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 rows={10}
-                placeholder={lang === 'ar' ? 'الصق النص المراد فحصه هنا...' : 'Paste the text to check here...'}
+                placeholder={lang === 'ar' ? 'الصق النص المراد فحصه هنا أو ارفع ملف...' : 'Paste the text to check here or upload a file...'}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               />
             </div>
 
-            <Button onClick={handleCheck} disabled={loading || !text.trim()} className="gap-2">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              {loading ? (lang === 'ar' ? 'جاري الفحص...' : 'Checking...') : (lang === 'ar' ? 'فحص النص' : 'Check Text')}
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handleCheck} disabled={loading || uploading || !text.trim()} className="gap-2">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {loading ? (lang === 'ar' ? 'جاري الفحص...' : 'Checking...') : (lang === 'ar' ? 'فحص النص' : 'Check Text')}
+              </Button>
+              <Button variant="outline" className="gap-2 relative" disabled={uploading}>
+                <Upload className="h-4 w-4" />
+                {uploading ? (lang === 'ar' ? 'جاري القراءة...' : 'Reading...') : (lang === 'ar' ? 'رفع ملف' : 'Upload File')}
+                <input
+                  type="file"
+                  accept=".txt,.md,.pdf,.doc,.docx"
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
