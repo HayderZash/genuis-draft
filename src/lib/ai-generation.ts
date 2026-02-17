@@ -3,7 +3,7 @@ import type { TranslationKey } from '@/i18n/translations';
 
 interface GenerateParams {
   apiKey: string;
-  provider: 'openai' | 'gemini';
+  provider: 'openai' | 'gemini' | 'groq';
   project: ProjectData;
   lang: 'ar' | 'en';
   onProgress: (step: string, progress: number) => void;
@@ -14,7 +14,7 @@ const DEFAULT_WORD_TARGETS = [1200, 1800, 1800, 1200, 900, 900];
 const WORDS_PER_PAGE = 250;
 
 async function callAI(
-  provider: 'openai' | 'gemini',
+  provider: 'openai' | 'gemini' | 'groq',
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
@@ -75,15 +75,19 @@ async function callAI(
     throw new Error('Gemini API failed after retries');
   }
 
-  // OpenAI
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  // OpenAI / Groq (OpenAI-compatible)
+  const isGroq = provider === 'groq';
+  const baseUrl = isGroq ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1';
+  const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

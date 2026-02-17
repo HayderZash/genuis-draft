@@ -91,10 +91,9 @@ const ProjectEditor = () => {
 
   const handleGenerate = async () => {
     if (!project) return;
-    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini') || 'openai';
-    const apiKey = provider === 'gemini'
-      ? localStorage.getItem('gemini_api_key')
-      : localStorage.getItem('openai_api_key');
+    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq') || 'openai';
+    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
+    const apiKey = localStorage.getItem(keyMap[provider]);
     if (!apiKey) {
       toast({ title: t('apiKeyRequired'), variant: 'destructive' });
       return;
@@ -120,10 +119,9 @@ const ProjectEditor = () => {
 
   const handleRegenerateChapter = async (chapterIndex: number) => {
     if (!project) return;
-    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini') || 'openai';
-    const apiKey = provider === 'gemini'
-      ? localStorage.getItem('gemini_api_key')
-      : localStorage.getItem('openai_api_key');
+    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq') || 'openai';
+    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
+    const apiKey = localStorage.getItem(keyMap[provider]);
     if (!apiKey) {
       toast({ title: t('apiKeyRequired'), variant: 'destructive' });
       return;
