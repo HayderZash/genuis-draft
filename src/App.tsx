@@ -9,6 +9,9 @@ import { Navbar } from "@/components/Navbar";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import ProjectEditor from "./pages/ProjectEditor";
+import Proofreading from "./pages/Proofreading";
+import Reports from "./pages/Reports";
+import CVBuilder from "./pages/CVBuilder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +30,9 @@ const AppRoutes = () => (
       <Route path="/auth" element={<Auth />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/project/:id" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
+      <Route path="/proofreading" element={<ProtectedRoute><Proofreading /></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/cvs" element={<ProtectedRoute><CVBuilder /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   </>

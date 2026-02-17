@@ -4,9 +4,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Trash2 } from 'lucide-react';
+import { Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface Project {
@@ -55,9 +55,68 @@ const Dashboard = () => {
 
   const statusVariant = (s: string) => s === 'completed' ? 'default' : s === 'generating' ? 'secondary' : 'outline';
 
+  const features = [
+    {
+      key: 'research',
+      icon: FileText,
+      title: t('researchProjects'),
+      desc: t('researchProjectsDesc'),
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+      active: true,
+    },
+    {
+      key: 'proofreading',
+      icon: CheckCircle,
+      title: t('proofreading'),
+      desc: t('proofreadingDesc'),
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50',
+      onClick: () => navigate('/proofreading'),
+    },
+    {
+      key: 'report',
+      icon: FileSpreadsheet,
+      title: t('createReport'),
+      desc: t('createReportDesc'),
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      onClick: () => navigate('/reports'),
+    },
+    {
+      key: 'cv',
+      icon: UserCircle,
+      title: t('createCV'),
+      desc: t('createCVDesc'),
+      color: 'text-violet-600',
+      bg: 'bg-violet-50',
+      onClick: () => navigate('/cvs'),
+    },
+  ];
+
   return (
-    <div className="container mx-auto max-w-4xl py-8 px-4">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container mx-auto max-w-5xl py-8 px-4">
+      {/* Feature Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        {features.map(f => (
+          <Card
+            key={f.key}
+            className={`cursor-pointer hover:shadow-lg transition-all border-2 hover:border-primary/30 ${f.active ? 'border-primary/20' : ''}`}
+            onClick={f.onClick || (() => {})}
+          >
+            <CardContent className="pt-6 pb-4 text-center">
+              <div className={`inline-flex p-3 rounded-xl ${f.bg} mb-3`}>
+                <f.icon className={`h-7 w-7 ${f.color}`} />
+              </div>
+              <h3 className="font-semibold text-sm">{f.title}</h3>
+              <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Research Projects Section */}
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">{t('myProjects')}</h2>
         <Button onClick={createProject} className="gap-2">
           <Plus className="h-4 w-4" /> {t('newProject')}

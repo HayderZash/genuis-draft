@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      cvs: {
+        Row: {
+          certifications: Json | null
+          created_at: string
+          cv_language: string
+          education: Json | null
+          email: string | null
+          experiences: Json | null
+          full_name: string
+          generated_content: string | null
+          github_url: string | null
+          id: string
+          languages: Json | null
+          linkedin_url: string | null
+          phone: string | null
+          portfolio_url: string | null
+          soft_skills: string[] | null
+          status: string
+          summary: string | null
+          technical_skills: string[] | null
+          twitter_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          certifications?: Json | null
+          created_at?: string
+          cv_language?: string
+          education?: Json | null
+          email?: string | null
+          experiences?: Json | null
+          full_name?: string
+          generated_content?: string | null
+          github_url?: string | null
+          id?: string
+          languages?: Json | null
+          linkedin_url?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          soft_skills?: string[] | null
+          status?: string
+          summary?: string | null
+          technical_skills?: string[] | null
+          twitter_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          certifications?: Json | null
+          created_at?: string
+          cv_language?: string
+          education?: Json | null
+          email?: string | null
+          experiences?: Json | null
+          full_name?: string
+          generated_content?: string | null
+          github_url?: string | null
+          id?: string
+          languages?: Json | null
+          linkedin_url?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          soft_skills?: string[] | null
+          status?: string
+          summary?: string | null
+          technical_skills?: string[] | null
+          twitter_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -41,6 +113,69 @@ export type Database = {
         }
         Relationships: []
       }
+      reports: {
+        Row: {
+          abstract: string | null
+          content: Json | null
+          created_at: string
+          custom_references: string | null
+          id: string
+          margin_bottom: number
+          margin_left: number
+          margin_right: number
+          margin_top: number
+          page_count: number
+          reference_count: number
+          report_type: string
+          research_language: string
+          status: string
+          text_direction: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          abstract?: string | null
+          content?: Json | null
+          created_at?: string
+          custom_references?: string | null
+          id?: string
+          margin_bottom?: number
+          margin_left?: number
+          margin_right?: number
+          margin_top?: number
+          page_count?: number
+          reference_count?: number
+          report_type?: string
+          research_language?: string
+          status?: string
+          text_direction?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          abstract?: string | null
+          content?: Json | null
+          created_at?: string
+          custom_references?: string | null
+          id?: string
+          margin_bottom?: number
+          margin_left?: number
+          margin_right?: number
+          margin_top?: number
+          page_count?: number
+          reference_count?: number
+          report_type?: string
+          research_language?: string
+          status?: string
+          text_direction?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       research_projects: {
         Row: {
           abstract: string | null
@@ -60,6 +195,7 @@ export type Database = {
           margin_top: number
           reference_count: number
           research_language: string
+          source_files: Json | null
           status: string
           text_direction: string
           title: string
@@ -84,6 +220,7 @@ export type Database = {
           margin_top?: number
           reference_count?: number
           research_language?: string
+          source_files?: Json | null
           status?: string
           text_direction?: string
           title?: string
@@ -108,6 +245,7 @@ export type Database = {
           margin_top?: number
           reference_count?: number
           research_language?: string
+          source_files?: Json | null
           status?: string
           text_direction?: string
           title?: string
