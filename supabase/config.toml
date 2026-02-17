@@ -2,3 +2,18 @@ project_id = "tshxttohwredmkxrtmlb"
 
 [functions.proofread]
 verify_jwt = false
+
+[functions.generate-cv]
+verify_jwt = false
+
+[functions.summarize]
+verify_jwt = false
+
+[functions.translate]
+verify_jwt = false
+
+[functions.plagiarism-check]
+verify_jwt = false
+
+[functions.generate-presentation]
+verify_jwt = false

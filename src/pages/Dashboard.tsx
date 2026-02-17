@@ -126,7 +126,7 @@ const Dashboard = () => {
       desc: t('summarizeTextDesc'),
       color: 'text-cyan-600',
       bg: 'bg-cyan-50',
-      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+      onClick: () => navigate('/summarizer'),
     },
     {
       key: 'translate',
@@ -135,7 +135,7 @@ const Dashboard = () => {
       desc: t('academicTranslationDesc'),
       color: 'text-rose-600',
       bg: 'bg-rose-50',
-      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+      onClick: () => navigate('/translator'),
     },
     {
       key: 'presentation',
@@ -144,7 +144,7 @@ const Dashboard = () => {
       desc: t('presentationGeneratorDesc'),
       color: 'text-orange-600',
       bg: 'bg-orange-50',
-      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+      onClick: () => navigate('/presentations'),
     },
     {
       key: 'plagiarism',
@@ -153,7 +153,7 @@ const Dashboard = () => {
       desc: t('plagiarismCheckerDesc'),
       color: 'text-teal-600',
       bg: 'bg-teal-50',
-      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+      onClick: () => navigate('/plagiarism'),
     },
   ];
 

@@ -13,6 +13,10 @@ import Proofreading from "./pages/Proofreading";
 import Reports from "./pages/Reports";
 import CVBuilder from "./pages/CVBuilder";
 import ResearchList from "./pages/ResearchList";
+import Summarizer from "./pages/Summarizer";
+import Translator from "./pages/Translator";
+import PlagiarismChecker from "./pages/PlagiarismChecker";
+import PresentationGenerator from "./pages/PresentationGenerator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +39,10 @@ const AppRoutes = () => (
       <Route path="/proofreading" element={<ProtectedRoute><Proofreading /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/cvs" element={<ProtectedRoute><CVBuilder /></ProtectedRoute>} />
+      <Route path="/summarizer" element={<ProtectedRoute><Summarizer /></ProtectedRoute>} />
+      <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
+      <Route path="/plagiarism" element={<ProtectedRoute><PlagiarismChecker /></ProtectedRoute>} />
+      <Route path="/presentations" element={<ProtectedRoute><PresentationGenerator /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   </>
