@@ -53,6 +53,9 @@ const CVBuilder = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [previewCV, setPreviewCV] = useState<CVData | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
 
   const [form, setForm] = useState({
     full_name: '',
@@ -211,8 +214,8 @@ const CVBuilder = () => {
 
     const processNode = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.trim();
-        if (text) paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 22 })] }));
+      const text = node.textContent?.trim();
+        if (text) paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 22 })], alignment: AlignmentType.JUSTIFIED }));
         return;
       }
       const el = node as HTMLElement;
@@ -220,15 +223,15 @@ const CVBuilder = () => {
       const text = el.textContent?.trim() || '';
       if (!text) return;
       if (tag === 'h1') {
-        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 32, bold: true })], heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 200 } }));
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 32, bold: true })], heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 200 } }));
       } else if (tag === 'h2') {
-        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 26, bold: true })], heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 26, bold: true })], heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
       } else if (tag === 'ul' || tag === 'ol') {
         el.querySelectorAll('li').forEach(li => {
-          paragraphs.push(new Paragraph({ children: [new TextRun({ text: `• ${li.textContent?.trim()}`, font: 'Arial', size: 22 })], spacing: { after: 50 } }));
+          paragraphs.push(new Paragraph({ children: [new TextRun({ text: `• ${li.textContent?.trim()}`, font: 'Times New Roman', size: 22 })], spacing: { after: 50 } }));
         });
       } else {
-        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 22 })], spacing: { after: 100 } }));
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 22 })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }));
       }
     };
 
@@ -245,7 +248,7 @@ const CVBuilder = () => {
     printWindow.document.write(`
       <html><head><title>${cv.full_name} - CV</title>
       <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; line-height: 1.6; }
+        body { font-family: 'Times New Roman', Times, serif; max-width: 800px; margin: 0 auto; padding: 40px; line-height: 1.6; text-align: justify; }
         h1 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
         h2 { color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px; }
         ul { padding-left: 20px; }
@@ -489,7 +492,7 @@ const CVBuilder = () => {
       ) : (
         <div className="grid gap-4">
           {cvs.map(c => (
-            <Card key={c.id} className="hover:shadow-md transition-shadow">
+            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => { if (c.generated_content) { setPreviewCV(c); setEditingContent(c.generated_content); setIsEditing(false); } }}>
               <CardHeader className="flex flex-row items-center justify-between py-4">
                 <div>
                   <CardTitle className="text-lg">{c.full_name || t('newCV')}</CardTitle>
@@ -499,21 +502,76 @@ const CVBuilder = () => {
                   <Badge variant={c.status === 'completed' ? 'default' : 'outline'}>{t(c.status as any)}</Badge>
                   {c.generated_content && (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => exportCVAsPDF(c)} className="gap-1">
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); exportCVAsPDF(c); }} className="gap-1">
                         <Download className="h-3 w-3" /> PDF
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => exportCVAsWord(c)} className="gap-1">
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); exportCVAsWord(c); }} className="gap-1">
                         <Download className="h-3 w-3" /> Word
                       </Button>
                     </>
                   )}
-                  <Button variant="ghost" size="icon" onClick={() => deleteCV(c.id)}>
+                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteCV(c.id); }}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               </CardHeader>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* CV Preview Modal */}
+      {previewCV && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setPreviewCV(null)}>
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-lg font-semibold">{t('previewCV')}: {previewCV.full_name}</h3>
+              <div className="flex items-center gap-2">
+                <Button variant={isEditing ? 'default' : 'outline'} size="sm" onClick={() => setIsEditing(!isEditing)} className="gap-1">
+                  {isEditing ? t('previewCV') : t('editCV')}
+                </Button>
+                {isEditing && (
+                  <Button size="sm" onClick={async () => {
+                    await supabase.from('cvs').update({ generated_content: editingContent }).eq('id', previewCV.id);
+                    const updated = { ...previewCV, generated_content: editingContent };
+                    setPreviewCV(updated);
+                    setCVs(prev => prev.map(c => c.id === previewCV.id ? updated : c));
+                    setIsEditing(false);
+                    toast({ title: lang === 'ar' ? 'تم حفظ التعديلات' : 'Changes saved' });
+                  }} className="gap-1">
+                    {t('saveChanges')}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => exportCVAsPDF({ ...previewCV, generated_content: editingContent })} className="gap-1">
+                  <Download className="h-3 w-3" /> PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportCVAsWord({ ...previewCV, generated_content: editingContent })} className="gap-1">
+                  <Download className="h-3 w-3" /> Word
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setPreviewCV(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {isEditing ? (
+                <Textarea
+                  value={editingContent}
+                  onChange={e => setEditingContent(e.target.value)}
+                  rows={30}
+                  className="font-serif text-sm w-full"
+                  dir={previewCV.generated_content?.includes('ال') ? 'rtl' : 'ltr'}
+                />
+              ) : (
+                <div
+                  className="prose max-w-none font-serif"
+                  style={{ fontFamily: "'Times New Roman', Times, serif", textAlign: 'justify' }}
+                  dir={editingContent.includes('ال') ? 'rtl' : 'ltr'}
+                  dangerouslySetInnerHTML={{ __html: editingContent }}
+                />
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -50,17 +50,8 @@ const Dashboard = () => {
 
   useEffect(() => { fetchAllItems(); }, []);
 
-  const createProject = async () => {
-    const { data, error } = await supabase
-      .from('research_projects')
-      .insert({ user_id: user!.id, title: '', chapter_count: 5, chapters: getDefaultChapters(5) })
-      .select('id')
-      .single();
-    if (error) {
-      toast({ title: error.message, variant: 'destructive' });
-      return;
-    }
-    navigate(`/project/${data.id}`);
+  const goToResearch = () => {
+    navigate('/research');
   };
 
   const deleteItem = async (item: CompletedItem) => {
@@ -99,7 +90,7 @@ const Dashboard = () => {
       desc: t('researchProjectsDesc'),
       color: 'text-primary',
       bg: 'bg-primary/10',
-      onClick: createProject,
+      onClick: goToResearch,
     },
     {
       key: 'proofreading',
