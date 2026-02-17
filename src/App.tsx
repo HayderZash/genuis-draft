@@ -12,6 +12,7 @@ import ProjectEditor from "./pages/ProjectEditor";
 import Proofreading from "./pages/Proofreading";
 import Reports from "./pages/Reports";
 import CVBuilder from "./pages/CVBuilder";
+import ResearchList from "./pages/ResearchList";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const AppRoutes = () => (
     <Routes>
       <Route path="/auth" element={<Auth />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/research" element={<ProtectedRoute><ResearchList /></ProtectedRoute>} />
       <Route path="/project/:id" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
       <Route path="/proofreading" element={<ProtectedRoute><Proofreading /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

@@ -172,6 +172,12 @@ export const translations = {
   newCV: { ar: 'سيرة ذاتية جديدة', en: 'New CV' },
   summary: { ar: 'الملخص المهني', en: 'Professional Summary' },
   cvLanguage: { ar: 'لغة السيرة الذاتية', en: 'CV Language' },
+  previewCV: { ar: 'معاينة السيرة الذاتية', en: 'Preview CV' },
+  editCV: { ar: 'تعديل السيرة الذاتية', en: 'Edit CV' },
+  saveChanges: { ar: 'حفظ التعديلات', en: 'Save Changes' },
+  myResearch: { ar: 'بحوثي الأكاديمية', en: 'My Academic Research' },
+  newResearch: { ar: 'بحث جديد', en: 'New Research' },
+  noResearch: { ar: 'لا توجد بحوث بعد. ابدأ بإنشاء بحث جديد!', en: 'No research yet. Start by creating a new one!' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
