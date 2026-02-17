@@ -47,8 +47,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error };
+
+    // Check if account is active and not expired
+    if (signInData.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_active, expires_at')
+        .eq('user_id', signInData.user.id)
+        .single();
+
+      if (profile) {
+        if (!profile.is_active) {
+          await supabase.auth.signOut();
+          return { error: { message: 'تم تعطيل حسابك. تواصل مع المدير.' } };
+        }
+        if (profile.expires_at && new Date(profile.expires_at) < new Date()) {
+          await supabase.auth.signOut();
+          return { error: { message: 'انتهت صلاحية حسابك. تواصل مع المدير لتمديد المدة.' } };
+        }
+      }
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
