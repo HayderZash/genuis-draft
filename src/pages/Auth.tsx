@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Navigate } from 'react-router-dom';
 
 const Auth = () => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +33,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">{t('login')}</CardTitle>
