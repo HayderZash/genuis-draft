@@ -15,40 +15,31 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const { t } = useLanguage();
-  const [provider, setProvider] = useState<'openai' | 'gemini'>('openai');
+  const [provider, setProvider] = useState<'openai' | 'gemini' | 'groq'>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
     if (open) {
-      const savedProvider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini') || 'openai';
+      const savedProvider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq') || 'openai';
       setProvider(savedProvider);
-      setApiKey(
-        savedProvider === 'gemini'
-          ? localStorage.getItem('gemini_api_key') || ''
-          : localStorage.getItem('openai_api_key') || ''
-      );
+      const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
+      setApiKey(localStorage.getItem(keyMap[savedProvider]) || '');
       setShowKey(false);
     }
   }, [open]);
 
-  const handleProviderChange = (val: 'openai' | 'gemini') => {
+  const handleProviderChange = (val: 'openai' | 'gemini' | 'groq') => {
     setProvider(val);
-    setApiKey(
-      val === 'gemini'
-        ? localStorage.getItem('gemini_api_key') || ''
-        : localStorage.getItem('openai_api_key') || ''
-    );
+    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
+    setApiKey(localStorage.getItem(keyMap[val]) || '');
     setShowKey(false);
   };
 
   const handleSave = () => {
     localStorage.setItem('ai_provider', provider);
-    if (provider === 'gemini') {
-      localStorage.setItem('gemini_api_key', apiKey);
-    } else {
-      localStorage.setItem('openai_api_key', apiKey);
-    }
+    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
+    localStorage.setItem(keyMap[provider], apiKey);
     toast({ title: t('apiKeySaved') });
     onOpenChange(false);
   };
@@ -69,6 +60,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
               <SelectContent>
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="gemini">Google Gemini</SelectItem>
+                <SelectItem value="groq">Groq Cloud</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -79,7 +71,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={provider === 'gemini' ? t('geminiApiKeyPlaceholder') : t('openaiApiKeyPlaceholder')}
+                placeholder={provider === 'groq' ? 'gsk_...' : provider === 'gemini' ? t('geminiApiKeyPlaceholder') : t('openaiApiKeyPlaceholder')}
                 className="pe-10"
               />
               <Button
