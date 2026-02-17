@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, Presentation, Download } from 'lucide-react';
+import { ArrowLeft, Loader2, Presentation, Download, FileDown } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import pptxgen from 'pptxgenjs';
 
 interface Slide {
   title: string;
@@ -55,6 +56,34 @@ const PresentationGenerator = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportAsPPTX = () => {
+    const isRtl = language === 'ar';
+    const pres = new pptxgen();
+    pres.layout = 'LAYOUT_WIDE';
+    if (isRtl) pres.rtlMode = true;
+
+    slides.forEach((slide) => {
+      const s = pres.addSlide();
+      s.addText(slide.title, {
+        x: 0.5, y: 0.3, w: '90%', h: 1,
+        fontSize: 28, bold: true, color: '1e40af',
+        align: isRtl ? 'right' : 'left',
+      });
+      const bulletPoints = slide.points.map(p => ({ text: p, options: { fontSize: 18, bullet: true, breakLine: true } }));
+      s.addText(bulletPoints as any, {
+        x: 0.8, y: 1.5, w: '85%', h: 4,
+        align: isRtl ? 'right' : 'left',
+        color: '333333',
+        lineSpacingMultiple: 1.5,
+      });
+      if (slide.notes) {
+        s.addNotes(slide.notes);
+      }
+    });
+
+    pres.writeFile({ fileName: `${title || 'presentation'}.pptx` });
   };
 
   const exportAsHTML = () => {
@@ -175,6 +204,9 @@ body { font-family: 'Times New Roman', Times, serif; margin: 0; }
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">{lang === 'ar' ? `العرض التقديمي (${slides.length} شريحة)` : `Presentation (${slides.length} slides)`}</h3>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={exportAsPPTX} className="gap-1">
+                  <FileDown className="h-3 w-3" /> PowerPoint
+                </Button>
                 <Button variant="outline" size="sm" onClick={exportAsHTML} className="gap-1">
                   <Download className="h-3 w-3" /> HTML
                 </Button>
