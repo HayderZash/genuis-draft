@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle } from 'lucide-react';
+import { Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle, BookOpen, Languages, Presentation, ShieldCheck } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface CompletedItem {
@@ -118,6 +118,42 @@ const Dashboard = () => {
       color: 'text-violet-600',
       bg: 'bg-violet-50',
       onClick: () => navigate('/cvs'),
+    },
+    {
+      key: 'summarize',
+      icon: BookOpen,
+      title: t('summarizeText'),
+      desc: t('summarizeTextDesc'),
+      color: 'text-cyan-600',
+      bg: 'bg-cyan-50',
+      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+    },
+    {
+      key: 'translate',
+      icon: Languages,
+      title: t('academicTranslation'),
+      desc: t('academicTranslationDesc'),
+      color: 'text-rose-600',
+      bg: 'bg-rose-50',
+      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+    },
+    {
+      key: 'presentation',
+      icon: Presentation,
+      title: t('presentationGenerator'),
+      desc: t('presentationGeneratorDesc'),
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
+      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
+    },
+    {
+      key: 'plagiarism',
+      icon: ShieldCheck,
+      title: t('plagiarismChecker'),
+      desc: t('plagiarismCheckerDesc'),
+      color: 'text-teal-600',
+      bg: 'bg-teal-50',
+      onClick: () => toast({ title: lang === 'ar' ? 'قريباً!' : 'Coming soon!' }),
     },
   ];
 
