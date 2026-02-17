@@ -1,13 +1,17 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Globe, LogOut, Settings } from 'lucide-react';
+import { Globe, LogOut, Settings, Shield } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SettingsDialog } from './SettingsDialog';
 
 export const Navbar = () => {
   const { lang, setLang, t } = useLanguage();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useUserRole();
+  const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
@@ -27,6 +31,12 @@ export const Navbar = () => {
             </Button>
             {user && (
               <>
+                {isAdmin && (
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="gap-1">
+                    <Shield className="h-4 w-4" />
+                    {lang === 'ar' ? 'الإدارة' : 'Admin'}
+                  </Button>
+                )}
                 <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
                   <Settings className="h-4 w-4" />
                 </Button>

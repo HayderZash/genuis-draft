@@ -18,6 +18,7 @@ import Translator from "./pages/Translator";
 import PlagiarismChecker from "./pages/PlagiarismChecker";
 import PresentationGenerator from "./pages/PresentationGenerator";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const AppRoutes = () => (
       <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
       <Route path="/plagiarism" element={<ProtectedRoute><PlagiarismChecker /></ProtectedRoute>} />
       <Route path="/presentations" element={<ProtectedRoute><PresentationGenerator /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   </>
