@@ -17,6 +17,7 @@ export const translations = {
 
   // Dashboard
   myProjects: { ar: 'مشاريعي البحثية', en: 'My Research Projects' },
+  completedProjects: { ar: 'المشاريع المنجزة', en: 'Completed Projects' },
   newProject: { ar: 'مشروع جديد', en: 'New Project' },
   noProjects: { ar: 'لا توجد مشاريع بعد. ابدأ بإنشاء مشروع جديد!', en: 'No projects yet. Start by creating a new one!' },
   draft: { ar: 'مسودة', en: 'Draft' },
@@ -137,6 +138,7 @@ export const translations = {
   phone: { ar: 'رقم الهاتف', en: 'Phone Number' },
   linkedinUrl: { ar: 'حساب LinkedIn', en: 'LinkedIn Profile' },
   githubUrl: { ar: 'حساب GitHub', en: 'GitHub Profile' },
+  facebookUrl: { ar: 'حساب Facebook', en: 'Facebook Profile' },
   portfolioUrl: { ar: 'الموقع الشخصي', en: 'Portfolio Website' },
   twitterUrl: { ar: 'حساب Twitter/X', en: 'Twitter/X Profile' },
   socialAccounts: { ar: 'الحسابات الاجتماعية', en: 'Social Accounts' },

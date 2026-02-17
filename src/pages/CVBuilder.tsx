@@ -11,8 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, ArrowLeft, UserCircle, Trash2, Loader2, Sparkles, X } from 'lucide-react';
+import { Plus, ArrowLeft, UserCircle, Trash2, Loader2, Sparkles, X, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
+import { saveAs } from 'file-saver';
 
 interface Experience {
   job_title: string;
@@ -40,6 +42,7 @@ interface CVData {
   full_name: string;
   status: string;
   created_at: string;
+  generated_content: string | null;
 }
 
 const CVBuilder = () => {
@@ -56,13 +59,13 @@ const CVBuilder = () => {
     phone: '',
     email: '',
     linkedin_url: '',
-    github_url: '',
+    facebook_url: '',
     portfolio_url: '',
     twitter_url: '',
     summary: '',
     cv_language: 'ar',
     show_linkedin: false,
-    show_github: false,
+    show_facebook: false,
     show_portfolio: false,
     show_twitter: false,
   });
@@ -78,7 +81,7 @@ const CVBuilder = () => {
   const fetchCVs = async () => {
     const { data } = await supabase
       .from('cvs')
-      .select('id, full_name, status, created_at')
+      .select('id, full_name, status, created_at, generated_content')
       .order('updated_at', { ascending: false });
     if (data) setCVs(data);
     setLoading(false);
@@ -115,7 +118,32 @@ const CVBuilder = () => {
     }
     setGenerating(true);
     try {
-      const { data, error } = await supabase
+      // Call AI to generate CV content
+      const cvPayload = {
+        full_name: form.full_name,
+        phone: form.phone,
+        email: form.email,
+        linkedin_url: form.show_linkedin ? form.linkedin_url : '',
+        facebook_url: form.show_facebook ? form.facebook_url : '',
+        portfolio_url: form.show_portfolio ? form.portfolio_url : '',
+        twitter_url: form.show_twitter ? form.twitter_url : '',
+        summary: form.summary,
+        experiences,
+        education,
+        technical_skills: technicalSkills,
+        soft_skills: softSkills,
+        languages,
+      };
+
+      const { data: aiData, error: aiError } = await supabase.functions.invoke('generate-cv', {
+        body: { cvData: cvPayload, language: form.cv_language },
+      });
+
+      if (aiError) throw new Error(aiError.message || 'AI generation failed');
+
+      const generatedContent = aiData?.content || '';
+
+      const { error } = await supabase
         .from('cvs')
         .insert({
           user_id: user!.id,
@@ -123,7 +151,7 @@ const CVBuilder = () => {
           phone: form.phone,
           email: form.email,
           linkedin_url: form.show_linkedin ? form.linkedin_url : '',
-          github_url: form.show_github ? form.github_url : '',
+          facebook_url: form.show_facebook ? form.facebook_url : '',
           portfolio_url: form.show_portfolio ? form.portfolio_url : '',
           twitter_url: form.show_twitter ? form.twitter_url : '',
           summary: form.summary,
@@ -133,10 +161,9 @@ const CVBuilder = () => {
           soft_skills: softSkills,
           languages: languages as any,
           education: education as any,
+          generated_content: generatedContent,
           status: 'completed',
-        })
-        .select('id')
-        .single();
+        });
       if (error) throw error;
       toast({ title: lang === 'ar' ? 'تم إنشاء السيرة الذاتية!' : 'CV created successfully!' });
       setShowForm(false);
@@ -149,7 +176,7 @@ const CVBuilder = () => {
   };
 
   const resetForm = () => {
-    setForm({ full_name: '', phone: '', email: '', linkedin_url: '', github_url: '', portfolio_url: '', twitter_url: '', summary: '', cv_language: 'ar', show_linkedin: false, show_github: false, show_portfolio: false, show_twitter: false });
+    setForm({ full_name: '', phone: '', email: '', linkedin_url: '', facebook_url: '', portfolio_url: '', twitter_url: '', summary: '', cv_language: 'ar', show_linkedin: false, show_facebook: false, show_portfolio: false, show_twitter: false });
     setExperiences([]);
     setTechnicalSkills([]);
     setSoftSkills([]);
@@ -174,6 +201,59 @@ const CVBuilder = () => {
       setSoftSkills([...softSkills, newSoftSkill.trim()]);
       setNewSoftSkill('');
     }
+  };
+
+  const exportCVAsWord = (cv: CVData) => {
+    if (!cv.generated_content) return;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${cv.generated_content}</div>`, 'text/html');
+    const paragraphs: Paragraph[] = [];
+
+    const processNode = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text) paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 22 })] }));
+        return;
+      }
+      const el = node as HTMLElement;
+      const tag = el.tagName?.toLowerCase();
+      const text = el.textContent?.trim() || '';
+      if (!text) return;
+      if (tag === 'h1') {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 32, bold: true })], heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 200 } }));
+      } else if (tag === 'h2') {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 26, bold: true })], heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+      } else if (tag === 'ul' || tag === 'ol') {
+        el.querySelectorAll('li').forEach(li => {
+          paragraphs.push(new Paragraph({ children: [new TextRun({ text: `• ${li.textContent?.trim()}`, font: 'Arial', size: 22 })], spacing: { after: 50 } }));
+        });
+      } else {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Arial', size: 22 })], spacing: { after: 100 } }));
+      }
+    };
+
+    doc.body.firstElementChild?.childNodes.forEach(processNode);
+
+    const wordDoc = new Document({ sections: [{ children: paragraphs }] });
+    Packer.toBlob(wordDoc).then(blob => saveAs(blob, `${cv.full_name || 'cv'}.docx`));
+  };
+
+  const exportCVAsPDF = (cv: CVData) => {
+    if (!cv.generated_content) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>${cv.full_name} - CV</title>
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; line-height: 1.6; }
+        h1 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 5px; }
+      </style></head><body>${cv.generated_content}</body></html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
   };
 
   return (
@@ -229,10 +309,10 @@ const CVBuilder = () => {
                 {form.show_linkedin && <Input value={form.linkedin_url} onChange={e => setForm({ ...form, linkedin_url: e.target.value })} placeholder="https://linkedin.com/in/..." />}
 
                 <div className="flex items-center gap-3">
-                  <Checkbox checked={form.show_github} onCheckedChange={(c) => setForm({ ...form, show_github: !!c })} />
-                  <Label className="flex-1">{t('githubUrl')}</Label>
+                  <Checkbox checked={form.show_facebook} onCheckedChange={(c) => setForm({ ...form, show_facebook: !!c })} />
+                  <Label className="flex-1">{t('facebookUrl')}</Label>
                 </div>
-                {form.show_github && <Input value={form.github_url} onChange={e => setForm({ ...form, github_url: e.target.value })} placeholder="https://github.com/..." />}
+                {form.show_facebook && <Input value={form.facebook_url} onChange={e => setForm({ ...form, facebook_url: e.target.value })} placeholder="https://facebook.com/..." />}
 
                 <div className="flex items-center gap-3">
                   <Checkbox checked={form.show_portfolio} onCheckedChange={(c) => setForm({ ...form, show_portfolio: !!c })} />
@@ -417,6 +497,16 @@ const CVBuilder = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={c.status === 'completed' ? 'default' : 'outline'}>{t(c.status as any)}</Badge>
+                  {c.generated_content && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => exportCVAsPDF(c)} className="gap-1">
+                        <Download className="h-3 w-3" /> PDF
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => exportCVAsWord(c)} className="gap-1">
+                        <Download className="h-3 w-3" /> Word
+                      </Button>
+                    </>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => deleteCV(c.id)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>

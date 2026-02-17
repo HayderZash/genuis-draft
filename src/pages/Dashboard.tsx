@@ -4,36 +4,51 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-interface Project {
+interface CompletedItem {
   id: string;
   title: string;
+  type: 'research' | 'report' | 'cv';
   status: string;
   created_at: string;
-  research_language: string;
 }
 
 const Dashboard = () => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [items, setItems] = useState<CompletedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchProjects = async () => {
-    const { data, error } = await supabase
-      .from('research_projects')
-      .select('id, title, status, created_at, research_language')
-      .order('updated_at', { ascending: false });
-    if (!error && data) setProjects(data);
+  const fetchAllItems = async () => {
+    const [researchRes, reportsRes, cvsRes] = await Promise.all([
+      supabase.from('research_projects').select('id, title, status, created_at').order('updated_at', { ascending: false }),
+      supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false }),
+      supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false }),
+    ]);
+
+    const allItems: CompletedItem[] = [];
+
+    if (researchRes.data) {
+      researchRes.data.forEach(p => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at }));
+    }
+    if (reportsRes.data) {
+      reportsRes.data.forEach(r => allItems.push({ id: r.id, title: r.title || (lang === 'ar' ? 'تقرير جديد' : 'New Report'), type: 'report', status: r.status, created_at: r.created_at }));
+    }
+    if (cvsRes.data) {
+      cvsRes.data.forEach(c => allItems.push({ id: c.id, title: c.full_name || (lang === 'ar' ? 'سيرة ذاتية' : 'CV'), type: 'cv', status: c.status, created_at: c.created_at }));
+    }
+
+    allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setItems(allItems);
     setLoading(false);
   };
 
-  useEffect(() => { fetchProjects(); }, []);
+  useEffect(() => { fetchAllItems(); }, []);
 
   const createProject = async () => {
     const { data, error } = await supabase
@@ -48,9 +63,30 @@ const Dashboard = () => {
     navigate(`/project/${data.id}`);
   };
 
-  const deleteProject = async (id: string) => {
-    await supabase.from('research_projects').delete().eq('id', id);
-    setProjects(prev => prev.filter(p => p.id !== id));
+  const deleteItem = async (item: CompletedItem) => {
+    if (item.type === 'research') {
+      await supabase.from('research_projects').delete().eq('id', item.id);
+    } else if (item.type === 'report') {
+      await supabase.from('reports').delete().eq('id', item.id);
+    } else {
+      await supabase.from('cvs').delete().eq('id', item.id);
+    }
+    setItems(prev => prev.filter(i => !(i.id === item.id && i.type === item.type)));
+  };
+
+  const openItem = (item: CompletedItem) => {
+    if (item.type === 'research') navigate(`/project/${item.id}`);
+    else if (item.type === 'report') navigate('/reports');
+    else navigate('/cvs');
+  };
+
+  const typeLabel = (type: string) => {
+    const labels: Record<string, { ar: string; en: string }> = {
+      research: { ar: 'بحث أكاديمي', en: 'Research' },
+      report: { ar: 'تقرير', en: 'Report' },
+      cv: { ar: 'سيرة ذاتية', en: 'CV' },
+    };
+    return labels[type]?.[lang] || type;
   };
 
   const statusVariant = (s: string) => s === 'completed' ? 'default' : s === 'generating' ? 'secondary' : 'outline';
@@ -63,7 +99,7 @@ const Dashboard = () => {
       desc: t('researchProjectsDesc'),
       color: 'text-primary',
       bg: 'bg-primary/10',
-      active: true,
+      onClick: createProject,
     },
     {
       key: 'proofreading',
@@ -101,8 +137,8 @@ const Dashboard = () => {
         {features.map(f => (
           <Card
             key={f.key}
-            className={`cursor-pointer hover:shadow-lg transition-all border-2 hover:border-primary/30 ${f.active ? 'border-primary/20' : ''}`}
-            onClick={f.onClick || (() => {})}
+            className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-primary/30"
+            onClick={f.onClick}
           >
             <CardContent className="pt-6 pb-4 text-center">
               <div className={`inline-flex p-3 rounded-xl ${f.bg} mb-3`}>
@@ -115,17 +151,14 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Research Projects Section */}
+      {/* Completed Projects Section */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">{t('myProjects')}</h2>
-        <Button onClick={createProject} className="gap-2">
-          <Plus className="h-4 w-4" /> {t('newProject')}
-        </Button>
+        <h2 className="text-2xl font-bold">{t('completedProjects')}</h2>
       </div>
 
       {loading ? (
         <div className="text-center text-muted-foreground py-12">...</div>
-      ) : projects.length === 0 ? (
+      ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-40" />
@@ -134,23 +167,23 @@ const Dashboard = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {projects.map(p => (
-            <Card key={p.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/project/${p.id}`)}>
+          {items.map(item => (
+            <Card key={`${item.type}-${item.id}`} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => openItem(item)}>
               <CardHeader className="flex flex-row items-center justify-between py-4">
                 <div>
-                  <CardTitle className="text-lg">{p.title || t('newProject')}</CardTitle>
+                  <CardTitle className="text-lg">{item.title}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {new Date(p.created_at).toLocaleDateString()}
+                    {typeLabel(item.type)} • {new Date(item.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={statusVariant(p.status)}>
-                    {t(p.status as any)}
+                  <Badge variant={statusVariant(item.status)}>
+                    {t(item.status as any)}
                   </Badge>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => { e.stopPropagation(); deleteProject(p.id); }}
+                    onClick={(e) => { e.stopPropagation(); deleteItem(item); }}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
