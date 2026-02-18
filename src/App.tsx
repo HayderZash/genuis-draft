@@ -17,7 +17,7 @@ import ResearchList from "./pages/ResearchList";
 import Summarizer from "./pages/Summarizer";
 import Translator from "./pages/Translator";
 import PlagiarismChecker from "./pages/PlagiarismChecker";
-import PresentationGenerator from "./pages/PresentationGenerator";
+import AIAssistant from "./pages/AIAssistant";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 
@@ -48,7 +48,7 @@ const AppRoutes = () => {
       <Route path="/summarizer" element={<ProtectedRoute><Summarizer /></ProtectedRoute>} />
       <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
       <Route path="/plagiarism" element={<ProtectedRoute><PlagiarismChecker /></ProtectedRoute>} />
-      <Route path="/presentations" element={<ProtectedRoute><PresentationGenerator /></ProtectedRoute>} />
+      <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

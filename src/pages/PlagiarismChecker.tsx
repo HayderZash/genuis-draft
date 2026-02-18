@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Loader2, ShieldCheck, AlertTriangle, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
 interface PlagiarismResult {
   originality_score: number;
@@ -22,6 +23,7 @@ interface PlagiarismResult {
 const PlagiarismChecker = () => {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const { checkAndConsume } = useFeatureAccess();
   const [text, setText] = useState('');
   const [language, setLanguage] = useState<string>('ar');
   const [loading, setLoading] = useState(false);
@@ -68,6 +70,8 @@ const PlagiarismChecker = () => {
       toast({ title: lang === 'ar' ? 'يرجى إدخال النص' : 'Please enter text', variant: 'destructive' });
       return;
     }
+    const allowed = await checkAndConsume('plagiarism', lang);
+    if (!allowed) return;
     setLoading(true);
     setResult(null);
     try {

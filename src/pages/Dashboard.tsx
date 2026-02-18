@@ -6,8 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle, BookOpen, Languages, Presentation, ShieldCheck } from 'lucide-react';
+import { Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle, BookOpen, Languages, Bot, ShieldCheck } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { PointsPanel } from '@/components/PointsPanel';
 
 interface CompletedItem {
   id: string;
@@ -138,13 +139,13 @@ const Dashboard = () => {
       onClick: () => navigate('/translator'),
     },
     {
-      key: 'presentation',
-      icon: Presentation,
-      title: t('presentationGenerator'),
-      desc: t('presentationGeneratorDesc'),
+      key: 'ai-assistant',
+      icon: Bot,
+      title: lang === 'ar' ? 'المساعد الأكاديمي الذكي' : 'AI Academic Assistant',
+      desc: lang === 'ar' ? 'مساعد ذكاء اصطناعي أكاديمي خبير - مجاني' : 'Expert AI academic assistant - free',
       color: 'text-orange-600',
       bg: 'bg-orange-50',
-      onClick: () => navigate('/presentations'),
+      onClick: () => navigate('/ai-assistant'),
     },
     {
       key: 'plagiarism',
@@ -159,6 +160,8 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto max-w-5xl py-8 px-4">
+      {/* Points Panel */}
+      <PointsPanel />
       {/* Feature Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {features.map(f => (

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, ArrowLeft, FileText, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getDefaultChapters } from '@/pages/Dashboard';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
 interface ResearchProject {
   id: string;
@@ -21,6 +22,7 @@ const ResearchList = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { checkAndConsume } = useFeatureAccess();
   const [projects, setProjects] = useState<ResearchProject[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +38,8 @@ const ResearchList = () => {
   useEffect(() => { fetchProjects(); }, []);
 
   const createProject = async () => {
+    const allowed = await checkAndConsume('research', lang);
+    if (!allowed) return;
     const { data, error } = await supabase
       .from('research_projects')
       .insert({ user_id: user!.id, title: '', chapter_count: 5, chapters: getDefaultChapters(5) })

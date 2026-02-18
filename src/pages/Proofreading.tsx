@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Upload, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
 interface Correction {
   original: string;
@@ -20,6 +21,7 @@ interface Correction {
 const Proofreading = () => {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const { checkAndConsume } = useFeatureAccess();
   const [text, setText] = useState('');
   const [language, setLanguage] = useState<string>('ar');
   const [loading, setLoading] = useState(false);
@@ -43,6 +45,8 @@ const Proofreading = () => {
       toast({ title: lang === 'ar' ? 'يرجى إدخال النص' : 'Please enter text', variant: 'destructive' });
       return;
     }
+    const allowed = await checkAndConsume('proofreading', lang);
+    if (!allowed) return;
     setLoading(true);
     setResult(null);
     try {

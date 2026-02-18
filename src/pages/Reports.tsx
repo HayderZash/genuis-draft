@@ -10,8 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader2, Sparkles, Download } from 'lucide-react';
+import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader2, Sparkles, Download, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
+import { saveAs } from 'file-saver';
 
 interface Report {
   id: string;
@@ -19,16 +22,20 @@ interface Report {
   status: string;
   report_type: string;
   created_at: string;
+  content: any;
+  research_language: string;
 }
 
 const Reports = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { checkAndConsume } = useFeatureAccess();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [previewReport, setPreviewReport] = useState<Report | null>(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -44,7 +51,7 @@ const Reports = () => {
   const fetchReports = async () => {
     const { data } = await supabase
       .from('reports')
-      .select('id, title, status, report_type, created_at')
+      .select('id, title, status, report_type, created_at, content, research_language')
       .order('updated_at', { ascending: false });
     if (data) setReports(data);
     setLoading(false);
@@ -57,6 +64,11 @@ const Reports = () => {
       toast({ title: lang === 'ar' ? 'يرجى إدخال عنوان التقرير' : 'Please enter report title', variant: 'destructive' });
       return;
     }
+
+    // Check points
+    const allowed = await checkAndConsume('reports', lang);
+    if (!allowed) return;
+
     const { data, error } = await supabase
       .from('reports')
       .insert({ user_id: user!.id, ...form })
@@ -66,22 +78,16 @@ const Reports = () => {
       toast({ title: error.message, variant: 'destructive' });
       return;
     }
-    // Generate report content
+
     setGenerating(true);
     try {
-      const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq') || 'openai';
-      const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
-      const apiKey = localStorage.getItem(keyMap[provider]);
-      if (!apiKey) {
-        toast({ title: t('apiKeyRequired'), variant: 'destructive' });
-        setGenerating(false);
-        navigate(`/reports`);
-        return;
-      }
-      // Simple generation via existing AI
-      const { callAIForReport } = await import('@/lib/report-generation');
-      const content = await callAIForReport({ ...form, provider, apiKey });
-      await supabase.from('reports').update({ content, status: 'completed' }).eq('id', data.id);
+      const { data: aiData, error: aiError } = await supabase.functions.invoke('generate-report', {
+        body: { ...form },
+      });
+      if (aiError) throw aiError;
+      
+      const content = aiData?.content || '';
+      await supabase.from('reports').update({ content: { _full: content }, status: 'completed' }).eq('id', data.id);
       toast({ title: lang === 'ar' ? 'تم توليد التقرير بنجاح!' : 'Report generated successfully!' });
     } catch (err: any) {
       toast({ title: err.message, variant: 'destructive' });
@@ -95,6 +101,61 @@ const Reports = () => {
   const deleteReport = async (id: string) => {
     await supabase.from('reports').delete().eq('id', id);
     setReports(prev => prev.filter(r => r.id !== id));
+  };
+
+  const exportAsPDF = (report: Report) => {
+    const content = report.content?._full;
+    if (!content) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const isRtl = report.research_language === 'ar';
+    printWindow.document.write(`
+      <html dir="${isRtl ? 'rtl' : 'ltr'}"><head><title>${report.title}</title>
+      <style>
+        body { font-family: 'Times New Roman', Times, serif; max-width: 800px; margin: 0 auto; padding: 40px; line-height: 1.8; text-align: justify; }
+        h1 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px; }
+        ul, ol { padding-${isRtl ? 'right' : 'left'}: 20px; }
+        li { margin-bottom: 5px; }
+      </style></head><body>${content}</body></html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  };
+
+  const exportAsWord = (report: Report) => {
+    const content = report.content?._full;
+    if (!content) return;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${content}</div>`, 'text/html');
+    const paragraphs: Paragraph[] = [];
+
+    const processNode = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text) paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 24 })], alignment: AlignmentType.JUSTIFIED }));
+        return;
+      }
+      const el = node as HTMLElement;
+      const tag = el.tagName?.toLowerCase();
+      const text = el.textContent?.trim() || '';
+      if (!text) return;
+      if (tag === 'h1') {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 32, bold: true })], heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 200 } }));
+      } else if (tag === 'h2') {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 26, bold: true })], heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+      } else if (tag === 'ul' || tag === 'ol') {
+        el.querySelectorAll('li').forEach(li => {
+          paragraphs.push(new Paragraph({ children: [new TextRun({ text: `• ${li.textContent?.trim()}`, font: 'Times New Roman', size: 24 })], spacing: { after: 50 } }));
+        });
+      } else {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text, font: 'Times New Roman', size: 24 })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }));
+      }
+    };
+
+    doc.body.firstElementChild?.childNodes.forEach(processNode);
+    const wordDoc = new Document({ sections: [{ children: paragraphs }] });
+    Packer.toBlob(wordDoc).then(blob => saveAs(blob, `${report.title || 'report'}.docx`));
   };
 
   return (
@@ -117,7 +178,7 @@ const Reports = () => {
               <Label>{t('reportTitle')}</Label>
               <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t('reportType')}</Label>
                 <Select value={form.report_type} onValueChange={v => setForm({ ...form, report_type: v })}>
@@ -175,16 +236,26 @@ const Reports = () => {
           {reports.map(r => (
             <Card key={r.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between py-4">
-                <div>
+                <div className="cursor-pointer" onClick={() => r.content?._full && setPreviewReport(r)}>
                   <CardTitle className="text-lg">{r.title || t('newReport')}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
                     {r.report_type === 'lab' ? t('labReport') : t('scientificReport')} • {new Date(r.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant={r.status === 'completed' ? 'default' : 'outline'}>
                     {t(r.status as any)}
                   </Badge>
+                  {r.content?._full && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => exportAsPDF(r)} className="gap-1">
+                        <Download className="h-3 w-3" /> PDF
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => exportAsWord(r)} className="gap-1">
+                        <Download className="h-3 w-3" /> Word
+                      </Button>
+                    </>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => deleteReport(r.id)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -192,6 +263,37 @@ const Reports = () => {
               </CardHeader>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Report Preview Modal */}
+      {previewReport && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setPreviewReport(null)}>
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-lg font-semibold">{previewReport.title}</h3>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportAsPDF(previewReport)} className="gap-1">
+                  <Download className="h-3 w-3" /> PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportAsWord(previewReport)} className="gap-1">
+                  <Download className="h-3 w-3" /> Word
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setPreviewReport(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="border-2 border-border rounded-lg p-8 bg-card shadow-inner mx-auto max-w-[800px]">
+                <div
+                  className="generated-content prose max-w-none"
+                  dir={previewReport.research_language === 'ar' ? 'rtl' : 'ltr'}
+                  dangerouslySetInnerHTML={{ __html: previewReport.content?._full || '' }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

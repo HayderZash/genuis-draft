@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, ArrowLeft, UserCircle, Trash2, Loader2, Sparkles, X, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -49,6 +50,7 @@ const CVBuilder = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { checkAndConsume } = useFeatureAccess();
   const [cvs, setCVs] = useState<CVData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -119,6 +121,8 @@ const CVBuilder = () => {
       toast({ title: lang === 'ar' ? 'يرجى إدخال الاسم' : 'Please enter your name', variant: 'destructive' });
       return;
     }
+    const allowed = await checkAndConsume('cv', lang);
+    if (!allowed) return;
     setGenerating(true);
     try {
       // Call AI to generate CV content
