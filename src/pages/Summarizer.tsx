@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, BookOpen, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
 const Summarizer = () => {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const { checkAndConsume } = useFeatureAccess();
   const [text, setText] = useState('');
   const [language, setLanguage] = useState<string>('ar');
   const [targetLength, setTargetLength] = useState('medium');
@@ -24,6 +26,8 @@ const Summarizer = () => {
       toast({ title: lang === 'ar' ? 'يرجى إدخال النص' : 'Please enter text', variant: 'destructive' });
       return;
     }
+    const allowed = await checkAndConsume('summarizer', lang);
+    if (!allowed) return;
     setLoading(true);
     setSummary('');
     try {
