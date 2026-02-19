@@ -23,7 +23,6 @@ const FEATURES = [
   { key: 'proofreading', ar: 'التدقيق اللغوي', en: 'Proofreading', cost: 0.5 },
   { key: 'translator', ar: 'الترجمة', en: 'Translation', cost: 0 },
   { key: 'summarizer', ar: 'التلخيص', en: 'Summarizer', cost: 0.25 },
-  { key: 'presentations', ar: 'العروض التقديمية', en: 'Presentations', cost: 1 },
   { key: 'plagiarism', ar: 'كشف الاستلال', en: 'Plagiarism Detection', cost: 0.5 },
 ];
 
@@ -342,7 +341,7 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
-                <Label className="flex items-center gap-2"><Phone className="h-4 w-4" /> {isAr ? 'رقم الهاتف' : 'Phone Number'}</Label>
+                <Label className="flex items-center gap-2"><Phone className="h-4 w-4" /> {isAr ? 'رقم الواتساب' : 'WhatsApp Number'}</Label>
                 <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="+964..." dir="ltr" />
               </div>
               <div className="space-y-2">

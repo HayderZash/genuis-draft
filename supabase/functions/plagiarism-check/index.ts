@@ -15,22 +15,30 @@ serve(async (req) => {
 
     const isAr = language === 'ar';
     const systemPrompt = isAr
-      ? `أنت خبير في كشف الانتحال الأكاديمي. قم بتحليل النص المقدم وأعطِ تقييماً شاملاً يتضمن:
-1. نسبة الأصالة التقديرية (من 0% إلى 100%)
-2. تحليل أسلوب الكتابة (هل يبدو أصلياً أم منسوخاً)
-3. ملاحظات على عبارات قد تكون مأخوذة من مصادر أخرى
-4. توصيات لتحسين الأصالة
+      ? `أنت خبير في كشف الاستلال الأكاديمي. قم بتحليل النص المقدم بدقة عالية جداً وأعطِ تقييماً شاملاً.
 
-أجب بتنسيق JSON:
-{"originality_score": number, "analysis": "string", "suspicious_phrases": ["string"], "recommendations": ["string"]}`
-      : `You are an academic plagiarism detection expert. Analyze the provided text and give a comprehensive assessment including:
-1. Estimated originality score (0% to 100%)
-2. Writing style analysis (does it appear original or copied)
-3. Notes on phrases that may be taken from other sources
-4. Recommendations for improving originality
+مهم جداً: يجب أن تعطي نسبة الاستلال (وليس نسبة الأصالة). نسبة الاستلال هي نسبة النص الذي يبدو منسوخاً أو مقتبساً من مصادر أخرى.
 
-Respond in JSON format:
-{"originality_score": number, "analysis": "string", "suspicious_phrases": ["string"], "recommendations": ["string"]}`;
+قم بتحليل:
+1. نسبة الاستلال التقديرية (من 0% إلى 100%) - كلما كانت أعلى كان النص أكثر استلالاً
+2. تحليل مفصل لأسلوب الكتابة
+3. العبارات التي تبدو مستلة أو منسوخة بالتحديد
+4. توصيات لتقليل نسبة الاستلال
+
+أجب بتنسيق JSON فقط:
+{"plagiarism_score": number, "analysis": "string", "suspicious_phrases": ["string"], "recommendations": ["string"]}`
+      : `You are an expert in academic plagiarism detection. Analyze the provided text with very high accuracy.
+
+IMPORTANT: You must provide the plagiarism percentage (NOT the originality percentage). The plagiarism score represents how much of the text appears to be copied or borrowed from other sources.
+
+Analyze:
+1. Estimated plagiarism score (0% to 100%) - higher means more plagiarism detected
+2. Detailed writing style analysis
+3. Specific phrases that appear to be plagiarized
+4. Recommendations to reduce plagiarism
+
+Respond in JSON format only:
+{"plagiarism_score": number, "analysis": "string", "suspicious_phrases": ["string"], "recommendations": ["string"]}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -39,13 +47,13 @@ Respond in JSON format:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text },
         ],
         max_tokens: 4000,
-        temperature: 0.2,
+        temperature: 0.1,
       }),
     });
 
@@ -53,11 +61,6 @@ Respond in JSON format:
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();

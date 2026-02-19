@@ -7,15 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   FileText, CheckCircle, FileSpreadsheet, UserCircle,
-  BookOpen, Languages, Presentation, ShieldCheck,
-  Phone, Send, Instagram, GraduationCap, Sparkles, ArrowRight
+  BookOpen, Languages, ShieldCheck, ImageIcon,
+  MessageCircle, Send, Instagram, GraduationCap, Sparkles, ArrowRight
 } from 'lucide-react';
 
 const Landing = () => {
   const { lang, setLang } = useLanguage();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [contactInfo, setContactInfo] = useState({ phone: '', telegram: '', instagram: '' });
+  const [contactInfo, setContactInfo] = useState({ whatsapp: '', telegram: '', instagram: '' });
   const isAr = lang === 'ar';
 
   useEffect(() => {
@@ -28,7 +28,7 @@ const Landing = () => {
       if (data) {
         const map: any = {};
         data.forEach((s: any) => {
-          if (s.key === 'contact_phone') map.phone = s.value;
+          if (s.key === 'contact_phone') map.whatsapp = s.value;
           if (s.key === 'contact_telegram') map.telegram = s.value;
           if (s.key === 'contact_instagram') map.instagram = s.value;
         });
@@ -39,14 +39,14 @@ const Landing = () => {
   }, []);
 
   const features = [
-    { icon: FileText, title: isAr ? 'البحوث الأكاديمية' : 'Academic Research', desc: isAr ? 'توليد بحوث تخرج كاملة بالذكاء الاصطناعي مع المراجع والتنسيق الأكاديمي' : 'AI-powered full graduation research with references and academic formatting', color: 'text-primary' },
+    { icon: FileText, title: isAr ? 'البحوث الأكاديمية' : 'Academic Research', desc: isAr ? 'توليد بحوث تخرج كاملة بالذكاء الاصطناعي مع المراجع والتنسيق الأكاديمي' : 'AI-powered full graduation research with references and academic formatting', color: 'text-blue-600' },
     { icon: CheckCircle, title: isAr ? 'التدقيق اللغوي' : 'Proofreading', desc: isAr ? 'تدقيق لغوي شامل للنصوص الأكاديمية مع تصحيح الأخطاء النحوية والإملائية' : 'Comprehensive linguistic proofreading with grammar and spelling corrections', color: 'text-emerald-600' },
     { icon: FileSpreadsheet, title: isAr ? 'التقارير العلمية' : 'Scientific Reports', desc: isAr ? 'إنشاء تقارير علمية ومختبرية احترافية جاهزة للتسليم' : 'Create professional scientific and lab reports ready for submission', color: 'text-amber-600' },
     { icon: UserCircle, title: isAr ? 'السيرة الذاتية' : 'CV Builder', desc: isAr ? 'إنشاء سيرة ذاتية احترافية متوافقة مع أنظمة ATS الحديثة' : 'Build professional ATS-compatible CVs', color: 'text-violet-600' },
     { icon: BookOpen, title: isAr ? 'تلخيص النصوص' : 'Text Summarizer', desc: isAr ? 'تلخيص النصوص الطويلة والأبحاث بشكل ذكي ومختصر' : 'Smart summarization of long texts and research papers', color: 'text-cyan-600' },
     { icon: Languages, title: isAr ? 'الترجمة الأكاديمية' : 'Academic Translation', desc: isAr ? 'ترجمة أكاديمية دقيقة بين العربية والإنجليزية' : 'Precise academic translation between Arabic and English', color: 'text-rose-600' },
-    { icon: Presentation, title: isAr ? 'العروض التقديمية' : 'Presentations', desc: isAr ? 'توليد عروض PowerPoint تلقائياً من البحوث والمحتوى الأكاديمي' : 'Auto-generate PowerPoint presentations from research', color: 'text-orange-600' },
-    { icon: ShieldCheck, title: isAr ? 'كشف نسبة الاستلال' : 'Plagiarism Detection', desc: isAr ? 'فحص النصوص والتأكد من أصالتها ونسبة التطابق' : 'Check text originality and similarity percentage', color: 'text-teal-600' },
+    { icon: ImageIcon, title: isAr ? 'مولد الصور الاحترافية' : 'Image Generator', desc: isAr ? 'إنشاء صور احترافية بالذكاء الاصطناعي لمشاريعك' : 'Generate professional AI images for your projects', color: 'text-orange-600' },
+    { icon: ShieldCheck, title: isAr ? 'كشف نسبة الاستلال' : 'Plagiarism Detection', desc: isAr ? 'فحص النصوص وكشف نسبة الاستلال بدقة عالية' : 'Check texts and detect plagiarism percentage accurately', color: 'text-teal-600' },
   ];
 
   return (
@@ -81,9 +81,7 @@ const Landing = () => {
             {isAr ? 'مساعدك الأكاديمي الذكي لإنجاز مشاريعك بجودة عالية' : 'Your Smart Academic Assistant for High-Quality Projects'}
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            {isAr
-              ? 'منصة متكاملة تجمع أدوات البحث الأكاديمي والتدقيق والترجمة وإنشاء التقارير والسير الذاتية في مكان واحد'
-              : 'An integrated platform combining academic research, proofreading, translation, reports, and CV tools in one place'}
+            {isAr ? 'منصة متكاملة تجمع أدوات البحث الأكاديمي والتدقيق والترجمة وإنشاء التقارير والسير الذاتية في مكان واحد' : 'An integrated platform combining academic research, proofreading, translation, reports, and CV tools in one place'}
           </p>
           <Button size="lg" onClick={() => navigate('/auth')} className="text-lg px-8 py-6">
             {isAr ? 'ابدأ الآن' : 'Get Started'}
@@ -120,15 +118,13 @@ const Landing = () => {
             {isAr ? 'للحصول على حساب' : 'Get an Account'}
           </h3>
           <p className="text-muted-foreground mb-8">
-            {isAr
-              ? 'للحصول على حساب في منصة المساعد الأكاديمي تواصل مع مسؤول المنصة على الحسابات التالية'
-              : 'To get an account on the Academic Assistant Platform, contact the platform administrator through the following channels'}
+            {isAr ? 'للحصول على حساب في منصة المساعد الأكاديمي تواصل مع مسؤول المنصة على الحسابات التالية' : 'To get an account on the Academic Assistant Platform, contact the platform administrator through the following channels'}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            {contactInfo.phone && (
-              <a href={`tel:${contactInfo.phone}`} className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 hover:border-primary/50 transition-colors bg-background">
-                <Phone className="h-5 w-5 text-primary" />
-                <span className="font-medium" dir="ltr">{contactInfo.phone}</span>
+            {contactInfo.whatsapp && (
+              <a href={`https://wa.me/${contactInfo.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 hover:border-primary/50 transition-colors bg-background">
+                <MessageCircle className="h-5 w-5 text-green-500" />
+                <span className="font-medium" dir="ltr">{contactInfo.whatsapp}</span>
               </a>
             )}
             {contactInfo.telegram && (
@@ -144,7 +140,7 @@ const Landing = () => {
               </a>
             )}
           </div>
-          {!contactInfo.phone && !contactInfo.telegram && !contactInfo.instagram && (
+          {!contactInfo.whatsapp && !contactInfo.telegram && !contactInfo.instagram && (
             <p className="text-sm text-muted-foreground mt-4">
               {isAr ? 'لم يتم إضافة معلومات التواصل بعد' : 'Contact information not yet configured'}
             </p>
@@ -152,7 +148,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
         <p>{isAr ? '© 2026 منصة المساعد الأكاديمي. جميع الحقوق محفوظة.' : '© 2026 Academic Assistant Platform. All rights reserved.'}</p>
       </footer>
