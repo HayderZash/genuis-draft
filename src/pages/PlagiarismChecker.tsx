@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
 interface PlagiarismResult {
-  originality_score: number;
+  plagiarism_score: number;
   analysis: string;
   suspicious_phrases: string[];
   recommendations: string[];
@@ -41,12 +41,10 @@ const PlagiarismChecker = () => {
       return;
     }
 
-    // For PDF/DOCX, we read as text (basic extraction)
     if (ext === 'pdf' || ext === 'docx' || ext === 'doc') {
       setUploading(true);
       try {
         const content = await file.text();
-        // Try to extract readable text
         const cleaned = content.replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FFa-zA-Z0-9\s.,;:!?()[\]{}\-'"]/g, ' ')
           .replace(/\s+/g, ' ').trim();
         if (cleaned.length > 50) {
@@ -84,9 +82,14 @@ const PlagiarismChecker = () => {
       try {
         const jsonMatch = resultText.match(/```json?\s*([\s\S]*?)```/) || resultText.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : resultText;
-        parsed = JSON.parse(jsonStr);
+        const raw = JSON.parse(jsonStr);
+        // Support both formats - convert old format
+        if ('originality_score' in raw && !('plagiarism_score' in raw)) {
+          raw.plagiarism_score = 100 - raw.originality_score;
+        }
+        parsed = raw as PlagiarismResult;
       } catch {
-        parsed = { originality_score: 0, analysis: resultText, suspicious_phrases: [], recommendations: [] };
+        parsed = { plagiarism_score: 0, analysis: resultText, suspicious_phrases: [], recommendations: [] };
       }
       setResult(parsed);
     } catch (err: any) {
@@ -97,8 +100,8 @@ const PlagiarismChecker = () => {
   };
 
   const scoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 50) return 'text-amber-600';
+    if (score <= 20) return 'text-green-600';
+    if (score <= 50) return 'text-amber-600';
     return 'text-destructive';
   };
 
@@ -162,13 +165,20 @@ const PlagiarismChecker = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
-                  <p className={`text-5xl font-bold ${scoreColor(result.originality_score)}`}>
-                    {result.originality_score}%
+                  <p className={`text-5xl font-bold ${scoreColor(result.plagiarism_score)}`}>
+                    {result.plagiarism_score}%
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {lang === 'ar' ? 'نسبة الأصالة' : 'Originality Score'}
+                    {lang === 'ar' ? 'نسبة الاستلال' : 'Plagiarism Percentage'}
                   </p>
-                  <Progress value={result.originality_score} className="mt-3 h-3" />
+                  <Progress value={result.plagiarism_score} className="mt-3 h-3" />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {result.plagiarism_score <= 20
+                      ? (lang === 'ar' ? '✅ نسبة استلال منخفضة - نص أصلي' : '✅ Low plagiarism - original text')
+                      : result.plagiarism_score <= 50
+                      ? (lang === 'ar' ? '⚠️ نسبة استلال متوسطة - يحتاج مراجعة' : '⚠️ Moderate plagiarism - needs review')
+                      : (lang === 'ar' ? '🚨 نسبة استلال عالية - يحتاج إعادة صياغة' : '🚨 High plagiarism - needs rewriting')}
+                  </p>
                 </div>
 
                 <div className="p-4 bg-muted rounded-md generated-content" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -183,7 +193,7 @@ const PlagiarismChecker = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    {lang === 'ar' ? 'عبارات مشبوهة' : 'Suspicious Phrases'}
+                    {lang === 'ar' ? 'عبارات مستلة' : 'Plagiarized Phrases'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -11,24 +11,64 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    const { action, ...body } = await req.json();
+    const json = (data: any, status = 200) =>
+      new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // consume-points does NOT require admin - it's called by regular users
+    if (action === "consume-points") {
+      const { userId, feature, cost } = body;
+      
+      // Check profile
+      const { data: profile } = await adminClient.from("profiles").select("account_type, is_active, expires_at").eq("user_id", userId).single();
+      if (!profile) return json({ allowed: false, error: "No profile found" });
+      
+      // Check if user is active
+      if (!profile.is_active) return json({ allowed: false, error: "Account disabled" });
+      
+      // Check expiry
+      if (profile.expires_at && new Date(profile.expires_at) < new Date()) {
+        return json({ allowed: false, error: "Account expired" });
+      }
+
+      // Check feature access (applies to ALL account types)
+      const { data: access } = await adminClient.from("user_feature_access").select("is_enabled").eq("user_id", userId).eq("feature", feature).single();
+      if (access && !access.is_enabled) return json({ allowed: false, error: "Feature disabled" });
+
+      // Unlimited accounts don't need point checks
+      if (profile.account_type !== 'points') return json({ allowed: true });
+
+      if (cost === 0) return json({ allowed: true });
+
+      // Check points
+      const { data: pts } = await adminClient.from("user_feature_points").select("*").eq("user_id", userId).eq("feature", feature).single();
+      if (!pts) return json({ allowed: false, error: "No points allocated" });
+      if (pts.expires_at && new Date(pts.expires_at) < new Date()) return json({ allowed: false, error: "Points expired" });
+      if (pts.points_remaining < cost) return json({ allowed: false, error: "Insufficient points" });
+
+      // Deduct
+      await adminClient.from("user_feature_points").update({ points_remaining: pts.points_remaining - cost }).eq("id", pts.id);
+      return json({ allowed: true, remaining: pts.points_remaining - cost });
+    }
+
+    // All other actions require admin auth
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return json({ error: "Unauthorized" }, 401);
+    }
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: claimsData, error: claimsError } = await userClient.auth.getUser();
     if (claimsError || !claimsData.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ error: "Unauthorized" }, 401);
     }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: roleData } = await adminClient
       .from("user_roles")
@@ -38,12 +78,8 @@ Deno.serve(async (req) => {
       .single();
 
     if (!roleData) {
-      return new Response(JSON.stringify({ error: "Forbidden: Admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return json({ error: "Forbidden: Admin only" }, 403);
     }
-
-    const { action, ...body } = await req.json();
-    const json = (data: any, status = 200) =>
-      new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     // ── LIST USERS ──
     if (action === "list-users") {
@@ -94,7 +130,6 @@ Deno.serve(async (req) => {
         account_type: accountType || 'unlimited',
       }).eq("user_id", userId);
 
-      // Set feature access
       if (featureAccess) {
         const rows = Object.entries(featureAccess).map(([feature, enabled]) => ({
           user_id: userId, feature, is_enabled: enabled as boolean,
@@ -102,7 +137,6 @@ Deno.serve(async (req) => {
         await adminClient.from("user_feature_access").upsert(rows, { onConflict: "user_id,feature" });
       }
 
-      // Set feature points
       if (accountType === 'points' && featurePoints) {
         const rows = Object.entries(featurePoints).map(([feature, points]) => ({
           user_id: userId, feature, points_remaining: points as number,
@@ -179,31 +213,6 @@ Deno.serve(async (req) => {
         await adminClient.from("platform_settings").update({ value: s.value, updated_at: new Date().toISOString() }).eq("key", s.key);
       }
       return json({ success: true });
-    }
-
-    // ── CONSUME POINTS ──
-    if (action === "consume-points") {
-      const { userId, feature, cost } = body;
-      
-      // Check account type
-      const { data: profile } = await adminClient.from("profiles").select("account_type").eq("user_id", userId).single();
-      if (!profile || profile.account_type !== 'points') return json({ allowed: true });
-
-      // Check feature access
-      const { data: access } = await adminClient.from("user_feature_access").select("is_enabled").eq("user_id", userId).eq("feature", feature).single();
-      if (access && !access.is_enabled) return json({ allowed: false, error: "Feature disabled" });
-
-      if (cost === 0) return json({ allowed: true });
-
-      // Check points
-      const { data: pts } = await adminClient.from("user_feature_points").select("*").eq("user_id", userId).eq("feature", feature).single();
-      if (!pts) return json({ allowed: false, error: "No points allocated" });
-      if (pts.expires_at && new Date(pts.expires_at) < new Date()) return json({ allowed: false, error: "Points expired" });
-      if (pts.points_remaining < cost) return json({ allowed: false, error: "Insufficient points" });
-
-      // Deduct
-      await adminClient.from("user_feature_points").update({ points_remaining: pts.points_remaining - cost }).eq("id", pts.id);
-      return json({ allowed: true, remaining: pts.points_remaining - cost });
     }
 
     return json({ error: "Unknown action" }, 400);

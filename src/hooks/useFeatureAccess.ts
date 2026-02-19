@@ -9,7 +9,6 @@ const FEATURE_COSTS: Record<string, number> = {
   proofreading: 0.5,
   translator: 0,
   summarizer: 0.25,
-  presentations: 1,
   plagiarism: 0.5,
 };
 

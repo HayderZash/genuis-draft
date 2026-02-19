@@ -39,8 +39,8 @@ export const translations = {
   summarizeTextDesc: { ar: 'تلخيص النصوص الطويلة بالذكاء الاصطناعي', en: 'AI-powered summarization of long texts' },
   academicTranslation: { ar: 'الترجمة الأكاديمية', en: 'Academic Translation' },
   academicTranslationDesc: { ar: 'ترجمة نصوص أكاديمية بين العربية والإنجليزية', en: 'Translate academic texts between Arabic and English' },
-  presentationGenerator: { ar: 'توليد عروض تقديمية', en: 'Presentation Generator' },
-  presentationGeneratorDesc: { ar: 'إنشاء عروض PowerPoint من البحوث تلقائياً', en: 'Auto-generate PowerPoint presentations from research' },
+  imageGenerator: { ar: 'مولد الصور الاحترافية', en: 'Image Generator' },
+  imageGeneratorDesc: { ar: 'إنشاء صور احترافية بالذكاء الاصطناعي', en: 'Generate professional AI images' },
   plagiarismChecker: { ar: 'كشف نسبة الاستلال', en: 'Plagiarism Detection' },
   plagiarismCheckerDesc: { ar: 'فحص النصوص والتأكد من أصالتها ونسبة التطابق', en: 'Check texts for originality and similarity percentage' },
 

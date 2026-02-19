@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
+import { FloatingAIAssistant } from "@/components/FloatingAIAssistant";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -18,6 +19,7 @@ import Summarizer from "./pages/Summarizer";
 import Translator from "./pages/Translator";
 import PlagiarismChecker from "./pages/PlagiarismChecker";
 import AIAssistant from "./pages/AIAssistant";
+import ImageGenerator from "./pages/ImageGenerator";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 
@@ -49,9 +51,11 @@ const AppRoutes = () => {
       <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
       <Route path="/plagiarism" element={<ProtectedRoute><PlagiarismChecker /></ProtectedRoute>} />
       <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+      <Route path="/image-generator" element={<ProtectedRoute><ImageGenerator /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    {showNavbar && <FloatingAIAssistant />}
   </>
   );
 };

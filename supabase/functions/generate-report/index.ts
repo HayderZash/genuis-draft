@@ -15,19 +15,41 @@ serve(async (req) => {
 
     const isAr = research_language === 'ar';
     const wordTarget = page_count * 250;
-    const typeLabel = report_type === 'lab'
+    const isLab = report_type === 'lab';
+    const typeLabel = isLab
       ? (isAr ? 'تقرير مختبري' : 'laboratory report')
       : (isAr ? 'تقرير علمي' : 'scientific report');
 
     const refsNote = custom_references ? (isAr ? `استخدم هذه المراجع: ${custom_references}` : `Use these references: ${custom_references}`) : '';
 
+    // Report structure - no research methodology
+    const sections = isLab
+      ? (isAr
+          ? 'المقدمة، الأدوات والمواد، خطوات العمل، النتائج، التحليل والمناقشة، الاستنتاجات'
+          : 'Introduction, Materials and Equipment, Procedure, Results, Analysis and Discussion, Conclusions')
+      : (isAr
+          ? 'المقدمة والخلفية، الموضوع الرئيسي، العرض والتحليل، النتائج، التوصيات، الخاتمة'
+          : 'Introduction and Background, Main Topic, Presentation and Analysis, Findings, Recommendations, Conclusion');
+
     const systemPrompt = isAr
-      ? `أنت خبير أكاديمي. اكتب ${typeLabel} بأسلوب أكاديمي رسمي باللغة العربية. استخدم تنسيق HTML مع <h1> للعنوان الرئيسي و <h2> للعناوين الفرعية و <p> للنصوص.`
-      : `You are an academic expert. Write a ${typeLabel} in formal academic style in English. Use HTML with <h1> for main title, <h2> for section headings, <p> for body text.`;
+      ? `أنت خبير في كتابة التقارير. اكتب ${typeLabel} بأسلوب رسمي واضح باللغة العربية. 
+هذا تقرير وليس بحث أكاديمي - لا تضف منهجية البحث أو إطار نظري أو دراسات سابقة.
+اكتب بأسلوب تقريري مباشر وعملي.
+استخدم تنسيق HTML مع <h1> للعنوان الرئيسي و <h2> للعناوين الفرعية و <p> للنصوص و <ul>/<li> للقوائم.`
+      : `You are an expert report writer. Write a ${typeLabel} in formal, clear style in English.
+This is a REPORT not a research paper - do NOT include research methodology, theoretical framework, or literature review.
+Write in a direct, practical, report-style format.
+Use HTML with <h1> for main title, <h2> for section headings, <p> for body text, <ul>/<li> for lists.`;
 
     const userPrompt = isAr
-      ? `اكتب ${typeLabel} بعنوان "${title}". الملخص: ${abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. يجب أن يتضمن التقرير: مقدمة، المنهجية، النتائج، المناقشة، والخاتمة. أضف قائمة مراجع تحتوي على ${reference_count} مصدر. ${refsNote}`
-      : `Write a ${typeLabel} titled "${title}". Abstract: ${abstract || 'Not specified'}. Write approximately ${wordTarget} words. Include: Introduction, Methodology, Results, Discussion, and Conclusion. Add a reference list with ${reference_count} references. ${refsNote}`;
+      ? `اكتب ${typeLabel} بعنوان "${title}". التفاصيل: ${abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. 
+يجب أن يتضمن التقرير الأقسام التالية: ${sections}.
+أضف قائمة مراجع تحتوي على ${reference_count} مصدر في النهاية. ${refsNote}
+لا تضف منهجية بحث أو إطار نظري.`
+      : `Write a ${typeLabel} titled "${title}". Details: ${abstract || 'Not specified'}. Write approximately ${wordTarget} words.
+Include these sections: ${sections}.
+Add a reference list with ${reference_count} references at the end. ${refsNote}
+Do NOT include research methodology or theoretical framework.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -54,7 +76,6 @@ serve(async (req) => {
 
     const data = await response.json();
     let content = data.choices?.[0]?.message?.content || '';
-    // Clean any markdown code blocks
     content = content.replace(/^```html?\s*/gi, '').replace(/```\s*$/g, '').trim();
 
     return new Response(JSON.stringify({ content }), {
