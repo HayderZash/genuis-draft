@@ -3,7 +3,7 @@ import type { TranslationKey } from '@/i18n/translations';
 
 interface GenerateParams {
   apiKey: string;
-  provider: 'openai' | 'gemini' | 'groq';
+  provider: 'openai' | 'gemini' | 'groq' | 'orbit';
   project: ProjectData;
   lang: 'ar' | 'en';
   onProgress: (step: string, progress: number) => void;
@@ -14,13 +14,36 @@ const DEFAULT_WORD_TARGETS = [1200, 1800, 1800, 1200, 900, 900];
 const WORDS_PER_PAGE = 250;
 
 async function callAI(
-  provider: 'openai' | 'gemini' | 'groq',
+  provider: 'openai' | 'gemini' | 'groq' | 'orbit',
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
   temperature: number
 ): Promise<string> {
+  // Orbit Provider - OpenAI-compatible API
+  if (provider === 'orbit') {
+    const response = await fetch('https://api.orbit-provider.com/v1/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        model: 'claude-opus-4-6-thinking',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Orbit API error: ${response.status} - ${errText.slice(0, 200)}`);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+
   if (provider === 'gemini') {
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const maxRetries = 3;
@@ -153,11 +176,15 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
       ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML. ${numberingInstruction} والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
       : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. ${numberingInstruction} Body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
-    const userPrompt = researchLang === 'ar'
-      ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
-      : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
+    const pageCountStrict = researchLang === 'ar'
+      ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (ما يعادل ${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). لا تكتب أقل من ذلك. التزم بعدد الكلمات المطلوب بدقة.`
+      : `CRITICAL: This chapter MUST be exactly ${wordTarget} words long (equivalent to ${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Do NOT write less. Strictly adhere to the required word count.`;
 
-    const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 4000, 0.7);
+    const userPrompt = researchLang === 'ar'
+      ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. ${pageCountStrict} ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
+      : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. ${pageCountStrict} ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
+
+    const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 6000, 0.7);
     content[`chapter_${i}`] = cleanHtmlOutput(raw);
     onProgress(progressStep, baseProgress + (70 / totalChapters) * 0.8);
   }
@@ -192,7 +219,7 @@ function cleanHtmlOutput(text: string): string {
 }
 
 /** Regenerate a single chapter */
-export async function regenerateChapter({ apiKey, provider, project, lang, chapterIndex, onProgress, t }: GenerateParams & { chapterIndex: number }): Promise<string> {
+export async function regenerateChapter({ apiKey, provider, project, lang, chapterIndex, onProgress, t }: GenerateParams & { chapterIndex: number; }): Promise<string> {
   const researchLang = project.research_language || lang;
   const chapterName = researchLang === 'ar' ? project.chapters[chapterIndex].nameAr : project.chapters[chapterIndex].name;
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 20);
@@ -220,12 +247,17 @@ export async function regenerateChapter({ apiKey, provider, project, lang, chapt
     ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction} استخدم تنسيق HTML. ${numberingInstruction} والنص العادي <p>. ${figureInstruction} ${noRefsInChapter}`
     : `You are a strict academic expert. Write in formal academic style in English. ${dirInstruction} Use HTML formatting. ${numberingInstruction} Body as <p>. ${figureInstruction} ${noRefsInChapter}`;
 
+  const chapterPagesRegen = project.chapter_pages?.[chapterIndex];
+  const pageCountStrict = researchLang === 'ar'
+    ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (ما يعادل ${chapterPagesRegen || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). لا تكتب أقل من ذلك.`
+    : `CRITICAL: This chapter MUST be exactly ${wordTarget} words (equivalent to ${chapterPagesRegen || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Do NOT write less.`;
+
   const userPrompt = researchLang === 'ar'
-    ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
-    : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. Write approximately ${wordTarget} words. ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
+    ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}". الملخص: ${project.abstract || 'غير محدد'}. ${pageCountStrict} ${isLast ? 'هذا هو الفصل الأخير.' : ''}${refsInstruction}`
+    : `Write chapter "${chapterName}" for a research paper titled "${project.title}". Abstract: ${project.abstract || 'Not specified'}. ${pageCountStrict} ${isLast ? 'This is the final chapter.' : ''}${refsInstruction}`;
 
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 50);
-  const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 4000, 0.7);
+  const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 6000, 0.7);
   onProgress(t('finalizing'), 90);
   return cleanHtmlOutput(raw);
 }

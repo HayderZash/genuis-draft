@@ -20,7 +20,7 @@ interface Props {
 }
 
 export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRegenerateChapter, regeneratingIndex }: Props) => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   const handleChapterCountChange = (val: string) => {
     const count = parseInt(val);
@@ -114,6 +114,30 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         regeneratingIndex={regeneratingIndex}
       />
 
+      {/* Content Options */}
+      <div className="space-y-3">
+        <Label>{t('tablesAndLists')}</Label>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include_images"
+            checked={(project as any).include_images || false}
+            onCheckedChange={(v) => onUpdate({ include_images: !!v } as any)}
+          />
+          <label htmlFor="include_images" className="text-sm cursor-pointer">
+            {lang === 'ar' ? 'إضافة صور توضيحية مع عناوين' : 'Add illustrative images with captions'}
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include_data_tables"
+            checked={(project as any).include_data_tables || false}
+            onCheckedChange={(v) => onUpdate({ include_data_tables: !!v } as any)}
+          />
+          <label htmlFor="include_data_tables" className="text-sm cursor-pointer">
+            {lang === 'ar' ? 'إضافة جداول بيانات' : 'Add data tables'}
+          </label>
+        </div>
+      </div>
 
       <Button onClick={onGenerate} disabled={generating || !project.title} className="w-full gap-2">
         {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

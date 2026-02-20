@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Loader2, ImageIcon, Download, Sparkles } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 const ImageGenerator = () => {
   const { lang } = useLanguage();
@@ -13,6 +14,7 @@ const ImageGenerator = () => {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const isAr = lang === 'ar';
 
   const baseUrl = "https://image.pollinations.ai/prompt/";
@@ -21,20 +23,30 @@ const ImageGenerator = () => {
   const generateImage = () => {
     if (!description.trim()) return;
     setLoading(true);
-    const params = `?width=1024&height=1024&model=flux&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+    setImageLoaded(false);
+    const seed = Math.floor(Math.random() * 100000);
+    const params = `?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
     const finalUrl = `${baseUrl}${encodeURIComponent(description.trim() + enhancements)}${params}`;
     setImageUrl(finalUrl);
   };
 
-  const downloadImage = () => {
+  const downloadImage = async () => {
     if (!imageUrl) return;
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = 'generated-image.png';
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `generated-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      toast({ title: isAr ? 'فشل تنزيل الصورة' : 'Failed to download image', variant: 'destructive' });
+    }
   };
 
   return (
@@ -62,8 +74,8 @@ const ImageGenerator = () => {
               onKeyDown={e => e.key === 'Enter' && generateImage()}
             />
           </div>
-          <Button onClick={generateImage} disabled={!description.trim()} className="w-full gap-2">
-            <Sparkles className="h-4 w-4" />
+          <Button onClick={generateImage} disabled={!description.trim() || loading} className="w-full gap-2">
+            {loading && !imageLoaded ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {isAr ? 'إنشاء صورة استوديو' : 'Generate Studio Image'}
           </Button>
         </CardContent>
@@ -72,24 +84,31 @@ const ImageGenerator = () => {
       {imageUrl && (
         <Card>
           <CardContent className="pt-6 space-y-4">
-            <div className="relative rounded-xl overflow-hidden border bg-muted">
+            <div className="relative rounded-xl overflow-hidden border bg-muted min-h-[300px]">
               <img
                 src={imageUrl}
                 alt="Generated"
                 className="w-full h-auto"
-                onLoad={() => setLoading(false)}
-                onError={() => setLoading(false)}
+                crossOrigin="anonymous"
+                onLoad={() => { setLoading(false); setImageLoaded(true); }}
+                onError={() => {
+                  setLoading(false);
+                  toast({ title: isAr ? 'فشل في توليد الصورة. حاول مرة أخرى.' : 'Failed to generate image. Try again.', variant: 'destructive' });
+                }}
               />
-              {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+              {loading && !imageLoaded && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">{isAr ? 'جاري توليد الصورة...' : 'Generating image...'}</p>
                 </div>
               )}
             </div>
-            <Button onClick={downloadImage} variant="outline" className="w-full gap-2">
-              <Download className="h-4 w-4" />
-              {isAr ? 'تنزيل الصورة' : 'Download Image'}
-            </Button>
+            {imageLoaded && (
+              <Button onClick={downloadImage} variant="outline" className="w-full gap-2">
+                <Download className="h-4 w-4" />
+                {isAr ? 'تنزيل الصورة' : 'Download Image'}
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

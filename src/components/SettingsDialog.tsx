@@ -13,36 +13,48 @@ interface SettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+export type AIProvider = 'openai' | 'gemini' | 'groq' | 'orbit';
+
+const PROVIDER_KEY_MAP: Record<AIProvider, string> = {
+  gemini: 'gemini_api_key',
+  openai: 'openai_api_key',
+  groq: 'groq_api_key',
+  orbit: 'orbit_api_key',
+};
+
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
-  const { t } = useLanguage();
-  const [provider, setProvider] = useState<'openai' | 'gemini' | 'groq'>('openai');
+  const { t, lang } = useLanguage();
+  const [provider, setProvider] = useState<AIProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const isAr = lang === 'ar';
 
   useEffect(() => {
     if (open) {
-      const savedProvider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq') || 'openai';
+      const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
       setProvider(savedProvider);
-      const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
-      setApiKey(localStorage.getItem(keyMap[savedProvider]) || '');
+      setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
       setShowKey(false);
     }
   }, [open]);
 
-  const handleProviderChange = (val: 'openai' | 'gemini' | 'groq') => {
+  const handleProviderChange = (val: AIProvider) => {
     setProvider(val);
-    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
-    setApiKey(localStorage.getItem(keyMap[val]) || '');
+    setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[val]) || '');
     setShowKey(false);
   };
 
   const handleSave = () => {
     localStorage.setItem('ai_provider', provider);
-    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key' };
-    localStorage.setItem(keyMap[provider], apiKey);
+    localStorage.setItem(PROVIDER_KEY_MAP[provider], apiKey);
     toast({ title: t('apiKeySaved') });
     onOpenChange(false);
   };
+
+  const placeholder = provider === 'groq' ? 'gsk_...'
+    : provider === 'gemini' ? t('geminiApiKeyPlaceholder')
+    : provider === 'orbit' ? 'orb_...'
+    : t('openaiApiKeyPlaceholder');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,8 +73,14 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="gemini">Google Gemini</SelectItem>
                 <SelectItem value="groq">Groq Cloud</SelectItem>
+                <SelectItem value="orbit">Orbit Provider</SelectItem>
               </SelectContent>
             </Select>
+            {provider === 'orbit' && (
+              <p className="text-xs text-muted-foreground">
+                {isAr ? 'يوفر Claude Opus 4.6 و Gemini 3.0 Pro بسعر أقل 70%' : 'Provides Claude Opus 4.6 & Gemini 3.0 Pro at 70% less cost'}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>{t('apiKeyLabel')}</Label>
@@ -71,7 +89,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={provider === 'groq' ? 'gsk_...' : provider === 'gemini' ? t('geminiApiKeyPlaceholder') : t('openaiApiKeyPlaceholder')}
+                placeholder={placeholder}
                 className="pe-10"
               />
               <Button
