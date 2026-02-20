@@ -8,12 +8,12 @@ interface ReportGenParams {
   page_count: number;
   custom_references: string;
   reference_count: number;
-  provider: 'openai' | 'gemini' | 'groq';
+  provider: 'openai' | 'gemini' | 'groq' | 'orbit';
   apiKey: string;
 }
 
 async function callAI(
-  provider: 'openai' | 'gemini' | 'groq',
+  provider: 'openai' | 'gemini' | 'groq' | 'orbit',
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
@@ -35,6 +35,21 @@ async function callAI(
     if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  if (provider === 'orbit') {
+    const response = await fetch('https://api.orbit-provider.com/v1/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({
+        model: 'claude-opus-4-6-thinking',
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        max_tokens: maxTokens, temperature: 0.7,
+      }),
+    });
+    if (!response.ok) throw new Error(`Orbit API error: ${response.status}`);
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
   }
 
   const isGroq = provider === 'groq';

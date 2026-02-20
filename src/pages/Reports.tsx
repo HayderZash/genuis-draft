@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader2, Sparkles, Download, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
@@ -46,6 +47,8 @@ const Reports = () => {
     page_count: 3,
     custom_references: '',
     reference_count: 5,
+    include_images: false,
+    include_tables: false,
   });
 
   const fetchReports = async () => {
@@ -94,7 +97,7 @@ const Reports = () => {
     }
     setGenerating(false);
     setShowForm(false);
-    setForm({ title: '', report_type: 'scientific', abstract: '', research_language: 'ar', text_direction: 'rtl', page_count: 3, custom_references: '', reference_count: 5 });
+    setForm({ title: '', report_type: 'scientific', abstract: '', research_language: 'ar', text_direction: 'rtl', page_count: 3, custom_references: '', reference_count: 5, include_images: false, include_tables: false });
     fetchReports();
   };
 
@@ -212,6 +215,17 @@ const Reports = () => {
               <div className="space-y-2">
                 <Label>{t('referenceCount')}</Label>
                 <Input type="number" min={1} max={30} value={form.reference_count} onChange={e => setForm({ ...form, reference_count: parseInt(e.target.value) || 5 })} />
+              </div>
+            </div>
+            <div className="space-y-3 border-t pt-4">
+              <Label>{lang === 'ar' ? 'خيارات المحتوى' : 'Content Options'}</Label>
+              <div className="flex items-center gap-2">
+                <Checkbox id="rep_images" checked={form.include_images} onCheckedChange={(v) => setForm({ ...form, include_images: !!v })} />
+                <label htmlFor="rep_images" className="text-sm cursor-pointer">{lang === 'ar' ? 'إضافة صور توضيحية مع عناوين' : 'Add illustrative images with captions'}</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="rep_tables" checked={form.include_tables} onCheckedChange={(v) => setForm({ ...form, include_tables: !!v })} />
+                <label htmlFor="rep_tables" className="text-sm cursor-pointer">{lang === 'ar' ? 'إضافة جداول بيانات' : 'Add data tables'}</label>
               </div>
             </div>
             <Button onClick={createReport} disabled={generating} className="gap-2 w-full">
