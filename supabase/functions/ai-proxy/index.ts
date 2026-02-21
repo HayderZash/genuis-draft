@@ -20,19 +20,30 @@ serve(async (req) => {
     let content = "";
 
     if (provider === "orbit") {
-      const response = await fetch("https://api.orbit-provider.com/v1/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-        body: JSON.stringify({
-          model: "claude-opus-4-6-thinking",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: maxTokens || 6000,
-          temperature: temperature ?? 0.7,
-        }),
-      });
+      // Try /v1/chat/completions first (OpenAI-compatible), fallback to /v1/chat
+      const urls = [
+        "https://api.orbit-provider.com/v1/chat/completions",
+        "https://api.orbit-provider.com/v1/chat",
+      ];
+      let response: Response | null = null;
+      for (const url of urls) {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+          body: JSON.stringify({
+            model: "claude-opus-4-6-thinking",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            max_tokens: maxTokens || 6000,
+            temperature: temperature ?? 0.7,
+          }),
+        });
+        if (response.ok || response.status !== 404) break;
+        // consume body before retrying
+        await response.text().catch(() => {});
+      }
 
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
