@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -15,37 +15,55 @@ const ImageGenerator = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
   const isAr = lang === 'ar';
-
-  const baseUrl = "https://image.pollinations.ai/prompt/";
-  const enhancements = " professional studio photography, cinematic lighting, 8k resolution, hyper-realistic, product shot, isolated on clean background, industrial design";
 
   const generateImage = () => {
     if (!description.trim()) return;
     setLoading(true);
     setImageLoaded(false);
+    setImageUrl('');
+
+    const baseUrl = "https://image.pollinations.ai/prompt/";
+    const enhancements = ", professional studio photography, cinematic lighting, 8k resolution, hyper-realistic, product shot, isolated on clean background, industrial design";
     const seed = Math.floor(Math.random() * 100000);
     const params = `?width=1024&height=1024&model=flux&nologo=true&seed=${seed}`;
     const finalUrl = `${baseUrl}${encodeURIComponent(description.trim() + enhancements)}${params}`;
+
+    // Use a fresh URL to avoid caching issues
     setImageUrl(finalUrl);
   };
 
-  const downloadImage = async () => {
-    if (!imageUrl) return;
+  const downloadImage = () => {
+    if (!imgRef.current || !imageLoaded) return;
     try {
-      const response = await fetch(imageUrl);
-      if (!response.ok) throw new Error('Failed to fetch');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `generated-image-${Date.now()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Draw the loaded image to canvas to bypass CORS download restrictions
+      const canvas = document.createElement('canvas');
+      canvas.width = imgRef.current.naturalWidth;
+      canvas.height = imgRef.current.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not supported');
+      ctx.drawImage(imgRef.current, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          // Fallback: open image in new tab
+          window.open(imageUrl, '_blank');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `generated-image-${Date.now()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast({ title: isAr ? 'تم تنزيل الصورة بنجاح' : 'Image downloaded successfully' });
+      }, 'image/png');
     } catch {
-      toast({ title: isAr ? 'فشل تنزيل الصورة' : 'Failed to download image', variant: 'destructive' });
+      // Fallback: open in new tab for manual save
+      window.open(imageUrl, '_blank');
+      toast({ title: isAr ? 'تم فتح الصورة في نافذة جديدة - احفظها يدوياً' : 'Image opened in new tab - save manually' });
     }
   };
 
@@ -86,6 +104,7 @@ const ImageGenerator = () => {
           <CardContent className="pt-6 space-y-4">
             <div className="relative rounded-xl overflow-hidden border bg-muted min-h-[300px]">
               <img
+                ref={imgRef}
                 src={imageUrl}
                 alt="Generated"
                 className="w-full h-auto"
@@ -93,13 +112,14 @@ const ImageGenerator = () => {
                 onLoad={() => { setLoading(false); setImageLoaded(true); }}
                 onError={() => {
                   setLoading(false);
+                  setImageLoaded(false);
                   toast({ title: isAr ? 'فشل في توليد الصورة. حاول مرة أخرى.' : 'Failed to generate image. Try again.', variant: 'destructive' });
                 }}
               />
               {loading && !imageLoaded && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">{isAr ? 'جاري توليد الصورة...' : 'Generating image...'}</p>
+                  <p className="text-sm text-muted-foreground">{isAr ? 'جاري توليد الصورة... قد يستغرق 10-30 ثانية' : 'Generating image... may take 10-30 seconds'}</p>
                 </div>
               )}
             </div>

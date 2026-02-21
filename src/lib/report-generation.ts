@@ -1,4 +1,5 @@
-/** Report generation using the same AI providers as research */
+/** Report generation using the AI proxy edge function */
+import { supabase } from '@/integrations/supabase/client';
 
 interface ReportGenParams {
   title: string;
@@ -8,70 +9,26 @@ interface ReportGenParams {
   page_count: number;
   custom_references: string;
   reference_count: number;
+  include_images?: boolean;
+  include_tables?: boolean;
   provider: 'openai' | 'gemini' | 'groq' | 'orbit';
   apiKey: string;
 }
 
 async function callAI(
-  provider: 'openai' | 'gemini' | 'groq' | 'orbit',
+  provider: string,
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number
 ): Promise<string> {
-  if (provider === 'gemini') {
-    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: combinedPrompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
-        }),
-      }
-    );
-    if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  }
-
-  if (provider === 'orbit') {
-    const response = await fetch('https://api.orbit-provider.com/v1/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-      body: JSON.stringify({
-        model: 'claude-opus-4-6-thinking',
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-        max_tokens: maxTokens, temperature: 0.7,
-      }),
-    });
-    if (!response.ok) throw new Error(`Orbit API error: ${response.status}`);
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
-  }
-
-  const isGroq = provider === 'groq';
-  const baseUrl = isGroq ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1';
-  const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini';
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    }),
+  const { data, error } = await supabase.functions.invoke('ai-proxy', {
+    body: { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature: 0.7 },
   });
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `API error: ${response.status}`);
-  }
-  const data = await response.json();
-  return data.choices[0]?.message?.content || '';
+
+  if (error) throw new Error(error.message || 'AI proxy call failed');
+  if (data?.error) throw new Error(data.error);
+  return data?.content || '';
 }
 
 function cleanHtml(text: string): string {
@@ -79,24 +36,62 @@ function cleanHtml(text: string): string {
 }
 
 export async function callAIForReport(params: ReportGenParams): Promise<Record<string, string>> {
-  const { title, report_type, abstract, research_language, page_count, custom_references, reference_count, provider, apiKey } = params;
+  const { title, report_type, abstract, research_language, page_count, custom_references, reference_count, include_images, include_tables, provider, apiKey } = params;
   const isAr = research_language === 'ar';
   const wordTarget = page_count * 250;
+  const isLab = report_type === 'lab';
 
-  const typeLabel = report_type === 'lab'
+  const typeLabel = isLab
     ? (isAr ? 'تقرير مختبري' : 'laboratory report')
     : (isAr ? 'تقرير علمي' : 'scientific report');
 
+  const sections = isLab
+    ? (isAr
+      ? 'المقدمة، الأدوات والمواد، خطوات العمل، النتائج، التحليل والمناقشة، الاستنتاجات'
+      : 'Introduction, Materials and Equipment, Procedure, Results, Analysis and Discussion, Conclusions')
+    : (isAr
+      ? 'المقدمة والخلفية، الموضوع الرئيسي، العرض والتحليل، النتائج، التوصيات، الخاتمة'
+      : 'Introduction and Background, Main Topic, Presentation and Analysis, Findings, Recommendations, Conclusion');
+
+  const imagesInstruction = include_images
+    ? (isAr ? 'أضف صوراً توضيحية مع عناوين بتنسيق <p class="figure-caption"><em>[الشكل X: الوصف]</em></p>.' : 'Add illustrative images with captions as <p class="figure-caption"><em>[Figure X: Description]</em></p>.')
+    : '';
+  const tablesInstruction = include_tables
+    ? (isAr ? 'أضف جداول بيانات مع عنوان <p><strong>جدول X: الوصف</strong></p> متبوعاً بـ <table>.' : 'Add data tables with <p><strong>Table X: Description</strong></p> followed by <table>.')
+    : '';
+
+  const pageCountStrict = isAr
+    ? `هام جداً: يجب أن يكون التقرير بطول ${wordTarget} كلمة بالضبط (${page_count} صفحات). التزم بعدد الكلمات بدقة.`
+    : `CRITICAL: The report MUST be exactly ${wordTarget} words (${page_count} pages). Strictly adhere to this word count.`;
+
   const systemPrompt = isAr
-    ? `أنت خبير أكاديمي. اكتب ${typeLabel} بأسلوب أكاديمي رسمي باللغة العربية. استخدم تنسيق HTML مع <h1> للعنوان الرئيسي و <h2> للعناوين الفرعية و <p> للنصوص.`
-    : `You are an academic expert. Write a ${typeLabel} in formal academic style in English. Use HTML with <h1> for main title, <h2> for section headings, <p> for body text.`;
+    ? `أنت خبير في كتابة التقارير. اكتب ${typeLabel} بأسلوب رسمي واضح باللغة العربية.
+هذا تقرير وليس بحث أكاديمي - لا تضف منهجية البحث أو إطار نظري أو دراسات سابقة.
+اكتب بأسلوب تقريري مباشر وعملي.
+استخدم HTML فقط: <h1> للعنوان، <h2> للعناوين الفرعية، <p> للنصوص، <ul>/<li> للقوائم.
+لا تستخدم رموز خاصة أو Markdown.
+${imagesInstruction} ${tablesInstruction}`
+    : `You are an expert report writer. Write a ${typeLabel} in formal, clear English.
+This is a REPORT not a research paper - do NOT include research methodology, theoretical framework, or literature review.
+Write in a direct, practical, report-style format.
+Use HTML only: <h1> for main title, <h2> for sections, <p> for body, <ul>/<li> for lists.
+No Markdown, no special symbols.
+${imagesInstruction} ${tablesInstruction}`;
 
   const refsNote = custom_references ? (isAr ? `استخدم هذه المراجع: ${custom_references}` : `Use these references: ${custom_references}`) : '';
 
   const userPrompt = isAr
-    ? `اكتب ${typeLabel} بعنوان "${title}". الملخص: ${abstract || 'غير محدد'}. اكتب حوالي ${wordTarget} كلمة. يجب أن يتضمن التقرير: مقدمة، المنهجية، النتائج، المناقشة، والخاتمة. أضف قائمة مراجع تحتوي على ${reference_count} مصدر. ${refsNote}`
-    : `Write a ${typeLabel} titled "${title}". Abstract: ${abstract || 'Not specified'}. Write approximately ${wordTarget} words. Include: Introduction, Methodology, Results, Discussion, and Conclusion. Add a reference list with ${reference_count} references. ${refsNote}`;
+    ? `اكتب ${typeLabel} بعنوان "${title}". التفاصيل: ${abstract || 'غير محدد'}. ${pageCountStrict}
+يجب أن يتضمن التقرير الأقسام التالية: ${sections}.
+أضف قائمة مراجع تحتوي على ${reference_count} مصدر في النهاية. ${refsNote}
+لا تضف منهجية بحث أو إطار نظري.
+اكتب كل قسم بفقرات مفصلة وكاملة.`
+    : `Write a ${typeLabel} titled "${title}". Details: ${abstract || 'Not specified'}. ${pageCountStrict}
+Include these sections: ${sections}.
+Add a reference list with ${reference_count} references at the end. ${refsNote}
+Do NOT include research methodology or theoretical framework.
+Write each section with full, detailed paragraphs.`;
 
-  const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 6000);
+  const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000);
   return { _full: cleanHtml(raw) };
 }
