@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.generate-report]
 verify_jwt = false
+
+[functions.ai-proxy]
+verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = false
