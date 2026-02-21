@@ -20,15 +20,18 @@ serve(async (req) => {
     let content = "";
 
     if (provider === "orbit") {
-      // Orbit Provider - OpenAI-compatible endpoint
-      const response = await fetch("https://api.orbit-provider.com/v1/chat/completions", {
+      // Orbit Provider - correct endpoint from user config
+      const baseUrl = "https://api.orbit-provider.com/cliproxy-api/api/provider/agy";
+      const orbitModel = "gemini-claude-sonnet-4-6-thinking";
+      
+      const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: orbitModel,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },

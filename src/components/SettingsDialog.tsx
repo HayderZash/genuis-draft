@@ -78,7 +78,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
             </Select>
             {provider === 'orbit' && (
               <p className="text-xs text-muted-foreground">
-                {isAr ? 'يوفر Claude Sonnet 4 بسعر أقل 70%' : 'Provides Claude Sonnet 4 at 70% less cost'}
+                {isAr ? 'يوفر Claude Sonnet 4.6 و Gemini عبر وكيل موحد بسعر أقل' : 'Provides Claude Sonnet 4.6 & Gemini via unified proxy at lower cost'}
               </p>
             )}
           </div>
