@@ -20,20 +20,24 @@ serve(async (req) => {
     let content = "";
 
     if (provider === "orbit") {
-      // Orbit Provider - correct endpoint from user config
-      const baseUrl = "https://api.orbit-provider.com/cliproxy-api/api/provider/agy";
+      // Orbit Provider - Anthropic-compatible proxy
+      // Orbit Provider - Anthropic-compatible proxy (CLIProxyAPI)
       const orbitModel = "gemini-claude-sonnet-4-6-thinking";
+      // Try auth via query param as documented credential source
+      const baseUrl = `https://api.orbit-provider.com/cliproxy-api/api/provider/agy/v1/messages?auth_token=${encodeURIComponent(apiKey)}`;
       
+      console.log("Calling Orbit API, model:", orbitModel);
       const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
           model: orbitModel,
+          system: systemPrompt,
           messages: [
-            { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
           max_tokens: maxTokens || 6000,
@@ -50,7 +54,8 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      content = data.choices?.[0]?.message?.content || "";
+      // Anthropic format: data.content[0].text
+      content = data.content?.[0]?.text || data.choices?.[0]?.message?.content || "";
     } else if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
       const response = await fetch(
