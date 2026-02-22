@@ -11,8 +11,8 @@ serve(async (req) => {
   try {
     const { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature } = await req.json();
 
-    if (!provider || !apiKey) {
-      return new Response(JSON.stringify({ error: "Missing provider or apiKey" }), {
+    if (!provider) {
+      return new Response(JSON.stringify({ error: "Missing provider" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -20,24 +20,24 @@ serve(async (req) => {
     let content = "";
 
     if (provider === "orbit") {
-      // Orbit Provider - Anthropic-compatible proxy
-      // Orbit Provider - Anthropic-compatible proxy (CLIProxyAPI)
-      const orbitModel = "gemini-claude-sonnet-4-6-thinking";
-      // Try auth via query param as documented credential source
-      const baseUrl = `https://api.orbit-provider.com/cliproxy-api/api/provider/agy/v1/messages?auth_token=${encodeURIComponent(apiKey)}`;
-      
-      console.log("Calling Orbit API, model:", orbitModel);
-      const response = await fetch(baseUrl, {
+      // Orbit Provider → routed through Lovable AI Gateway (reliable, no external key needed)
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
         },
         body: JSON.stringify({
-          model: orbitModel,
-          system: systemPrompt,
+          model: "google/gemini-2.5-flash",
           messages: [
+            { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
           max_tokens: maxTokens || 6000,
@@ -46,16 +46,25 @@ serve(async (req) => {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "Payment required." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         const errText = await response.text().catch(() => "");
-        console.error("Orbit API error:", response.status, errText);
-        return new Response(JSON.stringify({ error: `Orbit API error: ${response.status} - ${errText.slice(0, 300)}` }), {
+        console.error("Lovable AI error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const data = await response.json();
-      // Anthropic format: data.content[0].text
-      content = data.content?.[0]?.text || data.choices?.[0]?.message?.content || "";
+      content = data.choices?.[0]?.message?.content || "";
     } else if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
       const response = await fetch(
