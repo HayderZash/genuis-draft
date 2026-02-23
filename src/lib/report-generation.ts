@@ -1,5 +1,7 @@
 /** Report generation using the AI proxy edge function */
 import { supabase } from '@/integrations/supabase/client';
+import type { AIProvider } from '@/components/SettingsDialog';
+import { getMergeConfig, getProviderKey } from '@/components/SettingsDialog';
 
 interface ReportGenParams {
   title: string;
@@ -11,7 +13,7 @@ interface ReportGenParams {
   reference_count: number;
   include_images?: boolean;
   include_tables?: boolean;
-  provider: 'openai' | 'gemini' | 'groq' | 'orbit';
+  provider: AIProvider;
   apiKey: string;
 }
 
@@ -22,6 +24,24 @@ async function callAI(
   userPrompt: string,
   maxTokens: number
 ): Promise<string> {
+  const mergeConfig = getMergeConfig();
+
+  if (mergeConfig.enabled && mergeConfig.providers.length > 0) {
+    const providers = mergeConfig.providers
+      .map(p => ({ provider: p, apiKey: getProviderKey(p) }))
+      .filter(p => p.apiKey);
+
+    if (providers.length > 0) {
+      const isAr = systemPrompt.includes('العربية') || systemPrompt.includes('عربي');
+      const { data, error } = await supabase.functions.invoke('ai-merge-proxy', {
+        body: { providers, systemPrompt, userPrompt, maxTokens, temperature: 0.7, mergeLanguage: isAr ? 'ar' : 'en' },
+      });
+      if (error) throw new Error(error.message || 'Merge proxy call failed');
+      if (data?.error) throw new Error(data.error);
+      return data?.content || '';
+    }
+  }
+
   const { data, error } = await supabase.functions.invoke('ai-proxy', {
     body: { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature: 0.7 },
   });
@@ -33,6 +53,29 @@ async function callAI(
 
 function cleanHtml(text: string): string {
   return text.replace(/^```html\s*/gi, '').replace(/^```\s*/gm, '').replace(/```\s*$/g, '').trim();
+}
+
+/** Generate images for figure captions */
+async function processImagesInContent(html: string): Promise<string> {
+  const captionRegex = /\[(?:Figure|الشكل)\s+[\d.]+:\s*([^\]]+)\]/gi;
+  const matches = [...html.matchAll(captionRegex)];
+  if (matches.length === 0) return html;
+
+  let result = html;
+  for (const match of matches) {
+    const description = match[1].trim();
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: description },
+      });
+      if (error || !data?.imageUrl) continue;
+      const imgHtml = `<div class="generated-figure" style="text-align:center;margin:16px 0;"><img src="${data.imageUrl}" alt="${description}" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" /></div>`;
+      result = result.replace(match[0], imgHtml + match[0]);
+    } catch (e) {
+      console.error('Image generation failed for:', description, e);
+    }
+  }
+  return result;
 }
 
 export async function callAIForReport(params: ReportGenParams): Promise<Record<string, string>> {
@@ -93,5 +136,12 @@ Do NOT include research methodology or theoretical framework.
 Write each section with full, detailed paragraphs.`;
 
   const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000);
-  return { _full: cleanHtml(raw) };
+  let content = cleanHtml(raw);
+
+  // Generate images if enabled
+  if (include_images) {
+    content = await processImagesInContent(content);
+  }
+
+  return { _full: content };
 }
