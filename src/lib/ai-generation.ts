@@ -1,10 +1,12 @@
 import type { ProjectData } from '@/pages/ProjectEditor';
 import type { TranslationKey } from '@/i18n/translations';
 import { supabase } from '@/integrations/supabase/client';
+import type { AIProvider } from '@/components/SettingsDialog';
+import { getMergeConfig, getProviderKey, PROVIDER_KEY_MAP } from '@/components/SettingsDialog';
 
 interface GenerateParams {
   apiKey: string;
-  provider: 'openai' | 'gemini' | 'groq' | 'orbit';
+  provider: AIProvider;
   project: ProjectData;
   lang: 'ar' | 'en';
   onProgress: (step: string, progress: number) => void;
@@ -13,20 +15,51 @@ interface GenerateParams {
 
 const WORDS_PER_PAGE = 250;
 
-/** Route all AI calls through the edge function proxy to avoid CORS */
+/** Route AI call through single provider proxy */
 async function callAI(
-  provider: 'openai' | 'gemini' | 'groq' | 'orbit',
+  provider: AIProvider,
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
   temperature: number
 ): Promise<string> {
+  const mergeConfig = getMergeConfig();
+
+  if (mergeConfig.enabled && mergeConfig.providers.length > 0) {
+    return callMergeAI(mergeConfig.providers, systemPrompt, userPrompt, maxTokens, temperature);
+  }
+
   const { data, error } = await supabase.functions.invoke('ai-proxy', {
     body: { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature },
   });
 
   if (error) throw new Error(error.message || 'AI proxy call failed');
+  if (data?.error) throw new Error(data.error);
+  return data?.content || '';
+}
+
+/** Call merge proxy with multiple providers */
+async function callMergeAI(
+  providerNames: AIProvider[],
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number,
+  temperature: number
+): Promise<string> {
+  const providers = providerNames
+    .map(p => ({ provider: p, apiKey: getProviderKey(p) }))
+    .filter(p => p.apiKey);
+
+  if (providers.length === 0) throw new Error('No API keys configured for merge providers');
+
+  const isAr = systemPrompt.includes('العربية') || systemPrompt.includes('عربي');
+
+  const { data, error } = await supabase.functions.invoke('ai-merge-proxy', {
+    body: { providers, systemPrompt, userPrompt, maxTokens, temperature, mergeLanguage: isAr ? 'ar' : 'en' },
+  });
+
+  if (error) throw new Error(error.message || 'Merge proxy call failed');
   if (data?.error) throw new Error(data.error);
   return data?.content || '';
 }
@@ -40,10 +73,45 @@ function cleanHtmlOutput(text: string): string {
     .trim();
 }
 
+/** Generate images for figure captions in HTML content */
+async function processImagesInContent(
+  html: string,
+  onProgress?: (msg: string) => void
+): Promise<string> {
+  // Match figure captions like [Figure 1.2: Description] or [الشكل 1.2: الوصف]
+  const captionRegex = /\[(?:Figure|الشكل)\s+[\d.]+:\s*([^\]]+)\]/gi;
+  const matches = [...html.matchAll(captionRegex)];
+
+  if (matches.length === 0) return html;
+
+  let result = html;
+  for (const match of matches) {
+    const description = match[1].trim();
+    onProgress?.(`🎨 ${description}`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: description },
+      });
+
+      if (error || !data?.imageUrl) continue;
+
+      const imgHtml = `<div class="generated-figure" style="text-align:center;margin:16px 0;"><img src="${data.imageUrl}" alt="${description}" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" /></div>`;
+      // Insert image before the caption
+      result = result.replace(match[0], imgHtml + match[0]);
+    } catch (e) {
+      console.error('Image generation failed for:', description, e);
+    }
+  }
+
+  return result;
+}
+
 export async function generateResearch({ apiKey, provider, project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
   const content: Record<string, string> = {};
   const totalChapters = project.chapters.length;
   const researchLang = project.research_language || lang;
+  const includeImages = (project as any).include_images;
 
   // Generate Abstract
   onProgress(t('generatingAbstract'), 3);
@@ -72,7 +140,6 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
     const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
     const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
-    const includeImages = (project as any).include_images;
     const includeTables = (project as any).include_data_tables;
 
     const figureInstruction = includeImages
@@ -99,7 +166,6 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
       ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب محتوى كافياً لملء هذا العدد. لا تكتب أقل.`
       : `CRITICAL: This chapter MUST be exactly ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write enough content to fill this count. Do NOT write less.`;
 
-    // Build system prompt - clear and structured
     const systemPrompt = researchLang === 'ar'
       ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction}
 قواعد التنسيق:
@@ -120,7 +186,6 @@ ${tableInstruction ? `- ${tableInstruction}` : ''}
 - ${noRefsInChapter}
 - Do not use special symbols or unusual Unicode characters.`;
 
-    // Build user prompt - paragraph by paragraph instruction
     const userPrompt = researchLang === 'ar'
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}".
 الملخص: ${project.abstract || 'غير محدد'}.
@@ -152,7 +217,17 @@ ${isLast ? 'This is the final chapter - write a comprehensive conclusion.' : ''}
 Important: Write each paragraph fully and in detail. Do not abbreviate.`;
 
     const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000, 0.7);
-    content[`chapter_${i}`] = cleanHtmlOutput(raw);
+    let chapterContent = cleanHtmlOutput(raw);
+
+    // Generate images if enabled
+    if (includeImages) {
+      onProgress(researchLang === 'ar' ? `🎨 توليد صور الفصل ${chapterNum}...` : `🎨 Generating chapter ${chapterNum} images...`, baseProgress + (70 / totalChapters) * 0.6);
+      chapterContent = await processImagesInContent(chapterContent, (msg) =>
+        onProgress(msg, baseProgress + (70 / totalChapters) * 0.7)
+      );
+    }
+
+    content[`chapter_${i}`] = chapterContent;
     onProgress(progressStep, baseProgress + (70 / totalChapters) * 0.8);
   }
 
@@ -236,6 +311,14 @@ ${isLast ? 'Final chapter.' : ''}${refsInstruction}`;
 
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 50);
   const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000, 0.7);
+  let chapterContent = cleanHtmlOutput(raw);
+
+  // Generate images if enabled
+  if (includeImages) {
+    onProgress(researchLang === 'ar' ? '🎨 توليد الصور...' : '🎨 Generating images...', 75);
+    chapterContent = await processImagesInContent(chapterContent);
+  }
+
   onProgress(t('finalizing'), 90);
-  return cleanHtmlOutput(raw);
+  return chapterContent;
 }

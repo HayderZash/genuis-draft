@@ -11,6 +11,8 @@ import { GenerationProgress } from '@/components/project/GenerationProgress';
 import { PageSettingsPanel } from '@/components/project/PageSettingsPanel';
 import { generateResearch, regenerateChapter } from '@/lib/ai-generation';
 import { exportToDocx } from '@/lib/export-docx';
+import type { AIProvider } from '@/components/SettingsDialog';
+import { PROVIDER_KEY_MAP, getMergeConfig, getProviderKey } from '@/components/SettingsDialog';
 import { ArrowLeft, PanelLeftClose, PanelLeft, Download, Settings2 } from 'lucide-react';
 
 export interface ProjectData {
@@ -91,10 +93,14 @@ const ProjectEditor = () => {
 
   const handleGenerate = async () => {
     if (!project) return;
-    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq' | 'orbit') || 'openai';
-    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key', orbit: 'orbit_api_key' };
-    const apiKey = localStorage.getItem(keyMap[provider]);
-    if (!apiKey) {
+    const mergeConfig = getMergeConfig();
+    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+    const apiKey = getProviderKey(provider);
+    if (!mergeConfig.enabled && !apiKey) {
+      toast({ title: t('apiKeyRequired'), variant: 'destructive' });
+      return;
+    }
+    if (mergeConfig.enabled && mergeConfig.providers.every(p => !getProviderKey(p))) {
       toast({ title: t('apiKeyRequired'), variant: 'destructive' });
       return;
     }
@@ -119,10 +125,10 @@ const ProjectEditor = () => {
 
   const handleRegenerateChapter = async (chapterIndex: number) => {
     if (!project) return;
-    const provider = (localStorage.getItem('ai_provider') as 'openai' | 'gemini' | 'groq' | 'orbit') || 'openai';
-    const keyMap: Record<string, string> = { gemini: 'gemini_api_key', openai: 'openai_api_key', groq: 'groq_api_key', orbit: 'orbit_api_key' };
-    const apiKey = localStorage.getItem(keyMap[provider]);
-    if (!apiKey) {
+    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+    const apiKey = getProviderKey(provider);
+    const mergeConfig = getMergeConfig();
+    if (!mergeConfig.enabled && !apiKey) {
       toast({ title: t('apiKeyRequired'), variant: 'destructive' });
       return;
     }

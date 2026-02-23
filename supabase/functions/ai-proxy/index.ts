@@ -19,53 +19,7 @@ serve(async (req) => {
 
     let content = "";
 
-    if (provider === "orbit") {
-      // Orbit Provider → routed through Lovable AI Gateway (reliable, no external key needed)
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: maxTokens || 6000,
-          temperature: temperature ?? 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (response.status === 402) {
-          return new Response(JSON.stringify({ error: "Payment required." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const errText = await response.text().catch(() => "");
-        console.error("Lovable AI error:", response.status, errText);
-        return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const data = await response.json();
-      content = data.choices?.[0]?.message?.content || "";
-    } else if (provider === "gemini") {
+    if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -87,6 +41,116 @@ serve(async (req) => {
       }
       const data = await response.json();
       content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    } else if (provider === "orbit") {
+      // Orbit Provider - direct connection
+      const response = await fetch("https://api.orbit-provider.com/cliproxy-api/api/provider/agy/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gemini-claude-sonnet-4-6-thinking",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens || 6000,
+          temperature: temperature ?? 0.7,
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("Orbit API error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `Orbit API error: ${response.status} - ${errText}` }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || "";
+
+    } else if (provider === "openrouter") {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens || 6000,
+          temperature: temperature ?? 0.7,
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("OpenRouter API error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `OpenRouter API error: ${response.status}` }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || "";
+
+    } else if (provider === "siliconflow") {
+      const response = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "Qwen/Qwen2.5-72B-Instruct",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens || 6000,
+          temperature: temperature ?? 0.7,
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("SiliconFlow API error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `SiliconFlow API error: ${response.status}` }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || "";
+
+    } else if (provider === "mistral") {
+      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "mistral-large-latest",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens || 6000,
+          temperature: temperature ?? 0.7,
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("Mistral API error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `Mistral API error: ${response.status}` }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || "";
+
     } else {
       // OpenAI / Groq
       const isGroq = provider === "groq";
