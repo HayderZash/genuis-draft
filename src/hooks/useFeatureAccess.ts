@@ -10,6 +10,7 @@ const FEATURE_COSTS: Record<string, number> = {
   translator: 0,
   summarizer: 0.25,
   plagiarism: 0.5,
+  'image-gen': 0.1,
 };
 
 export const useFeatureAccess = () => {

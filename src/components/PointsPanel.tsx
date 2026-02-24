@@ -19,11 +19,12 @@ const FEATURE_LABELS: Record<string, { ar: string; en: string }> = {
   proofreading: { ar: 'التدقيق اللغوي', en: 'Proofreading' },
   summarizer: { ar: 'التلخيص', en: 'Summarizer' },
   plagiarism: { ar: 'كشف الاستلال', en: 'Plagiarism' },
+  'image-gen': { ar: 'توليد الصور', en: 'Image Gen' },
   translator: { ar: 'الترجمة (مجاني)', en: 'Translation (Free)' },
 };
 
 const FEATURE_COSTS: Record<string, number> = {
-  research: 2, reports: 1, cv: 0.5, proofreading: 0.5, summarizer: 0.25, plagiarism: 0.5, translator: 0,
+  research: 2, reports: 1, cv: 0.5, proofreading: 0.5, summarizer: 0.25, plagiarism: 0.5, 'image-gen': 0.1, translator: 0,
 };
 
 export const PointsPanel = () => {
