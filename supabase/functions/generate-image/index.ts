@@ -16,59 +16,43 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+    const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+    const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+
+    if (!accountId || !apiToken) {
+      return new Response(JSON.stringify({ error: "Cloudflare credentials not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const enhancedPrompt = `${prompt}, professional studio photography, cinematic lighting, 8k resolution, hyper-realistic, product shot, isolated on clean white background, industrial design, commercial quality`;
+    const model = "@cf/stabilityai/stable-diffusion-xl-base-1.0";
+    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const enhancedPrompt = `${prompt}, professional studio photography, cinematic lighting, 8k resolution, hyper-realistic, product shot, clean background, commercial quality`;
+
+    const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Authorization": `Bearer ${apiToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [
-          { role: "user", content: enhancedPrompt },
-        ],
-        modalities: ["image", "text"],
-      }),
+      body: JSON.stringify({ prompt: enhancedPrompt }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const errText = await response.text().catch(() => "");
-      console.error("Image generation error:", response.status, errText);
+      console.error("Cloudflare error:", response.status, errText);
       return new Response(JSON.stringify({ error: `Image generation failed: ${response.status}` }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await response.json();
-    const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Cloudflare returns raw image bytes
+    const imageBlob = await response.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(imageBlob)));
+    const imageUrl = `data:image/png;base64,${base64}`;
 
-    if (!imageData) {
-      console.error("No image in response:", JSON.stringify(data).slice(0, 500));
-      return new Response(JSON.stringify({ error: "No image generated" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ imageUrl: imageData }), {
+    return new Response(JSON.stringify({ imageUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
