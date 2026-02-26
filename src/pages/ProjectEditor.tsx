@@ -94,16 +94,8 @@ const ProjectEditor = () => {
   const handleGenerate = async () => {
     if (!project) return;
     const mergeConfig = getMergeConfig();
-    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'lovable' as AIProvider;
     const apiKey = getProviderKey(provider);
-    if (!mergeConfig.enabled && !apiKey) {
-      toast({ title: t('apiKeyRequired'), variant: 'destructive' });
-      return;
-    }
-    if (mergeConfig.enabled && mergeConfig.providers.every(p => !getProviderKey(p))) {
-      toast({ title: t('apiKeyRequired'), variant: 'destructive' });
-      return;
-    }
     setGenerationState({ active: true, step: t('analyzingTopic'), progress: 5 });
     try {
       const content = await generateResearch({
