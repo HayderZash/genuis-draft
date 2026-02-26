@@ -5,12 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MODELS: Record<string, string> = {
-  "stable-diffusion-xl": "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-  "flux-1-schnell": "@cf/black-forest-labs/flux-1-schnell",
-  "dreamshaper": "@cf/lykon/dreamshaper-8-lcm",
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -22,56 +16,61 @@ serve(async (req) => {
       });
     }
 
-    const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-    const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
-
-    if (!accountId || !apiToken) {
-      return new Response(JSON.stringify({ error: "Cloudflare credentials not configured" }), {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const selectedModel = MODELS[modelKey || "stable-diffusion-xl"] || MODELS["stable-diffusion-xl"];
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${selectedModel}`;
+    // Use Lovable AI image generation model
+    const selectedModel = modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
 
-    const enhancedPrompt = `${prompt}, professional studio photography, cinematic lighting, 8k resolution, hyper-realistic, clean background, commercial quality`;
-
-    const body: Record<string, unknown> = { prompt: enhancedPrompt };
-    
-    // flux-1-schnell uses num_steps
-    if (modelKey === "flux-1-schnell") {
-      body.num_steps = 8;
-    }
-
-    const response = await fetch(url, {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiToken}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: [
+          {
+            role: "user",
+            content: `Generate an image: ${prompt}`,
+          },
+        ],
+        modalities: ["image", "text"],
+      }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      console.error("Cloudflare error:", response.status, errText);
+      console.error("AI gateway error:", response.status, errText);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Credits exhausted" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ error: `Image generation failed: ${response.status}` }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Cloudflare returns raw image bytes
-    const imageBytes = new Uint8Array(await response.arrayBuffer());
-    
-    // Convert to base64 in chunks to avoid stack overflow
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < imageBytes.length; i += chunkSize) {
-      const chunk = imageBytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode(...chunk);
+    const data = await response.json();
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+    if (!imageUrl) {
+      console.error("No image in response:", JSON.stringify(data).slice(0, 500));
+      return new Response(JSON.stringify({ error: "No image generated" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    const base64 = btoa(binary);
-    const imageUrl = `data:image/png;base64,${base64}`;
 
     return new Response(JSON.stringify({ imageUrl, model: selectedModel }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

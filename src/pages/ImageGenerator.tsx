@@ -23,9 +23,8 @@ interface SavedImage {
 }
 
 const MODELS = [
-  { key: 'stable-diffusion-xl', label: 'Stable Diffusion XL', labelAr: 'ستيبل ديفيوجن XL' },
-  { key: 'flux-1-schnell', label: 'FLUX.1 Schnell', labelAr: 'فلكس 1 شنل (سريع)' },
-  { key: 'dreamshaper', label: 'DreamShaper 8', labelAr: 'دريم شيبر 8' },
+  { key: 'standard', label: 'Gemini Flash Image', labelAr: 'جيميني فلاش (سريع)' },
+  { key: 'pro', label: 'Gemini Pro Image', labelAr: 'جيميني برو (جودة عالية)' },
 ];
 
 const ImageGenerator = () => {
@@ -36,12 +35,11 @@ const ImageGenerator = () => {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('stable-diffusion-xl');
+  const [selectedModel, setSelectedModel] = useState('standard');
   const [gallery, setGallery] = useState<SavedImage[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(true);
   const isAr = lang === 'ar';
 
-  // Fetch gallery
   useEffect(() => {
     const fetchGallery = async () => {
       const { data } = await supabase
@@ -57,8 +55,6 @@ const ImageGenerator = () => {
 
   const generateImage = async () => {
     if (!description.trim()) return;
-
-    // Check points
     const allowed = await checkAndConsume('image-gen', lang);
     if (!allowed) return;
 
@@ -75,30 +71,20 @@ const ImageGenerator = () => {
 
       if (data?.imageUrl) {
         setImageUrl(data.imageUrl);
-
-        // Save to database
         if (user) {
-          const { data: saved, error: saveErr } = await supabase.from('generated_images').insert({
+          const { data: saved } = await supabase.from('generated_images').insert({
             user_id: user.id,
             prompt: description.trim(),
             model: selectedModel,
             image_url: data.imageUrl,
           }).select().single();
-
-          if (saved) {
-            setGallery(prev => [saved as SavedImage, ...prev]);
-          }
-          if (saveErr) console.error('Save error:', saveErr);
+          if (saved) setGallery(prev => [saved as SavedImage, ...prev]);
         }
       } else {
         throw new Error('No image returned');
       }
     } catch (err: any) {
-      toast({
-        title: isAr ? 'فشل في توليد الصورة' : 'Failed to generate image',
-        description: err.message,
-        variant: 'destructive',
-      });
+      toast({ title: isAr ? 'فشل في توليد الصورة' : 'Failed to generate image', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -148,7 +134,6 @@ const ImageGenerator = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Image Generator */}
         <TabsContent value="image-gen" className="space-y-6">
           <div className="text-center mb-6">
             <div className="inline-flex p-4 rounded-2xl bg-primary/10 mb-4">
@@ -156,7 +141,7 @@ const ImageGenerator = () => {
             </div>
             <h1 className="text-2xl font-bold">{isAr ? 'مُولد الصور الذكي' : 'AI Image Generator'}</h1>
             <p className="text-muted-foreground mt-2">
-              {isAr ? 'أنشئ صورًا احترافية بالذكاء الاصطناعي • تكلفة 0.1 نقطة' : 'Generate AI images • Costs 0.1 points'}
+              {isAr ? 'أنشئ صورًا دقيقة بالذكاء الاصطناعي • تكلفة 0.1 نقطة' : 'Generate precise AI images • Costs 0.1 points'}
             </p>
           </div>
 
@@ -167,27 +152,23 @@ const ImageGenerator = () => {
                 <Input
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder={isAr ? 'أدخل وصف الصورة هنا...' : 'Enter image description...'}
+                  placeholder={isAr ? 'مثال: صورة بطاطا طازجة على خلفية بيضاء' : 'e.g. Fresh potatoes on white background'}
                   onKeyDown={e => e.key === 'Enter' && generateImage()}
                   className="h-12 text-base"
-                  dir="rtl"
+                  dir="auto"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label className="font-semibold flex items-center gap-2">
                   <Cpu className="h-4 w-4" />
-                  {isAr ? 'نموذج الذكاء الاصطناعي' : 'AI Model'}
+                  {isAr ? 'جودة الصورة' : 'Image Quality'}
                 </Label>
                 <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MODELS.map(m => (
-                      <SelectItem key={m.key} value={m.key}>
-                        {isAr ? m.labelAr : m.label}
-                      </SelectItem>
+                      <SelectItem key={m.key} value={m.key}>{isAr ? m.labelAr : m.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -268,7 +249,6 @@ const ImageGenerator = () => {
           </div>
         </TabsContent>
 
-        {/* Tab 2: Research & Reports */}
         <TabsContent value="research">
           <div className="text-center mb-8">
             <div className="inline-flex p-4 rounded-2xl bg-primary/10 mb-4">
@@ -286,7 +266,7 @@ const ImageGenerator = () => {
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
                 <h3 className="font-bold text-lg mb-2">{isAr ? 'البحوث الأكاديمية' : 'Academic Research'}</h3>
-                <p className="text-sm text-muted-foreground">{isAr ? 'إنشاء بحوث تخرج كاملة مع توليد صور تلقائي' : 'Create full graduation research with auto image generation'}</p>
+                <p className="text-sm text-muted-foreground">{isAr ? 'إنشاء بحوث تخرج كاملة' : 'Create full graduation research'}</p>
               </CardContent>
             </Card>
             <Card className="group cursor-pointer border-border/50 hover:border-primary/40 hover:shadow-xl transition-all duration-300" onClick={() => navigate('/reports')}>
@@ -295,7 +275,7 @@ const ImageGenerator = () => {
                   <FileSpreadsheet className="h-8 w-8 text-primary" />
                 </div>
                 <h3 className="font-bold text-lg mb-2">{isAr ? 'التقارير العلمية' : 'Scientific Reports'}</h3>
-                <p className="text-sm text-muted-foreground">{isAr ? 'إنشاء تقارير احترافية مع رسومات توضيحية' : 'Create professional reports with illustrations'}</p>
+                <p className="text-sm text-muted-foreground">{isAr ? 'إنشاء تقارير احترافية' : 'Create professional reports'}</p>
               </CardContent>
             </Card>
           </div>
