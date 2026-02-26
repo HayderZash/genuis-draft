@@ -19,7 +19,46 @@ serve(async (req) => {
 
     let content = "";
 
-    if (provider === "gemini") {
+    // Lovable AI provider (default fallback, no user API key needed)
+    if (provider === "lovable" || !apiKey) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens || 8000,
+          temperature: temperature ?? 0.7,
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("Lovable AI error:", response.status, errText);
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || "";
+
+    } else if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,

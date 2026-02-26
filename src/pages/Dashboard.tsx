@@ -18,10 +18,32 @@ import { PointsPanel } from '@/components/PointsPanel';
 interface CompletedItem {
   id: string;
   title: string;
-  type: 'research' | 'report' | 'cv';
+  type: 'research' | 'report' | 'cv' | 'image';
   status: string;
   created_at: string;
 }
+
+const FEATURE_COLORS = [
+  { bg: 'from-blue-500/20 to-cyan-500/20', icon: 'text-blue-500', hover: 'group-hover:from-blue-500/30 group-hover:to-cyan-500/30', border: 'hover:border-blue-400/40' },
+  { bg: 'from-emerald-500/20 to-green-500/20', icon: 'text-emerald-500', hover: 'group-hover:from-emerald-500/30 group-hover:to-green-500/30', border: 'hover:border-emerald-400/40' },
+  { bg: 'from-purple-500/20 to-violet-500/20', icon: 'text-purple-500', hover: 'group-hover:from-purple-500/30 group-hover:to-violet-500/30', border: 'hover:border-purple-400/40' },
+  { bg: 'from-orange-500/20 to-amber-500/20', icon: 'text-orange-500', hover: 'group-hover:from-orange-500/30 group-hover:to-amber-500/30', border: 'hover:border-orange-400/40' },
+  { bg: 'from-pink-500/20 to-rose-500/20', icon: 'text-pink-500', hover: 'group-hover:from-pink-500/30 group-hover:to-rose-500/30', border: 'hover:border-pink-400/40' },
+  { bg: 'from-teal-500/20 to-cyan-500/20', icon: 'text-teal-500', hover: 'group-hover:from-teal-500/30 group-hover:to-cyan-500/30', border: 'hover:border-teal-400/40' },
+  { bg: 'from-indigo-500/20 to-blue-500/20', icon: 'text-indigo-500', hover: 'group-hover:from-indigo-500/30 group-hover:to-blue-500/30', border: 'hover:border-indigo-400/40' },
+  { bg: 'from-red-500/20 to-orange-500/20', icon: 'text-red-500', hover: 'group-hover:from-red-500/30 group-hover:to-orange-500/30', border: 'hover:border-red-400/40' },
+];
+
+const FEATURE_DESCRIPTIONS: Record<string, { ar: string; en: string }> = {
+  research: { ar: 'بحوث أكاديمية مع فصول ومراجع وتنسيق كامل بضغطة واحدة', en: 'Full academic research with chapters, references and formatting in one click' },
+  proofreading: { ar: 'تصحيح الأخطاء الإملائية والنحوية مع اقتراحات تحسين', en: 'Fix spelling and grammar errors with improvement suggestions' },
+  report: { ar: 'تقارير علمية ومختبرية احترافية جاهزة للطباعة', en: 'Professional scientific and lab reports ready to print' },
+  cv: { ar: 'سيرة ذاتية احترافية تناسب سوق العمل الحديث', en: 'Professional CV that fits the modern job market' },
+  summarize: { ar: 'تلخيص نصوص طويلة مع الحفاظ على الأفكار الرئيسية', en: 'Summarize long texts while keeping key ideas' },
+  translate: { ar: 'ترجمة أكاديمية دقيقة مع مراعاة المصطلحات المتخصصة', en: 'Precise academic translation with specialized terminology' },
+  'image-gen': { ar: 'توليد صور دقيقة ومطابقة للوصف بالذكاء الاصطناعي', en: 'Generate precise AI images matching your description' },
+  plagiarism: { ar: 'فحص النصوص لكشف نسبة التشابه مع المصادر الأخرى', en: 'Check texts for similarity with other sources' },
+};
 
 const Dashboard = () => {
   const { t, lang } = useLanguage();
@@ -30,18 +52,21 @@ const Dashboard = () => {
   const [items, setItems] = useState<CompletedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [flippedCard, setFlippedCard] = useState<string | null>(null);
 
   const fetchAllItems = async () => {
-    const [researchRes, reportsRes, cvsRes] = await Promise.all([
+    const [researchRes, reportsRes, cvsRes, imagesRes] = await Promise.all([
       supabase.from('research_projects').select('id, title, status, created_at').order('updated_at', { ascending: false }),
       supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false }),
       supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false }),
+      supabase.from('generated_images').select('id, prompt, created_at').order('created_at', { ascending: false }).limit(20),
     ]);
 
     const allItems: CompletedItem[] = [];
     if (researchRes.data) researchRes.data.forEach(p => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at }));
     if (reportsRes.data) reportsRes.data.forEach(r => allItems.push({ id: r.id, title: r.title || (lang === 'ar' ? 'تقرير جديد' : 'New Report'), type: 'report', status: r.status, created_at: r.created_at }));
     if (cvsRes.data) cvsRes.data.forEach(c => allItems.push({ id: c.id, title: c.full_name || (lang === 'ar' ? 'سيرة ذاتية' : 'CV'), type: 'cv', status: c.status, created_at: c.created_at }));
+    if (imagesRes.data) imagesRes.data.forEach(img => allItems.push({ id: img.id, title: img.prompt || (lang === 'ar' ? 'صورة مولدة' : 'Generated Image'), type: 'image', status: 'completed', created_at: img.created_at }));
 
     allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setItems(allItems);
@@ -53,6 +78,7 @@ const Dashboard = () => {
   const deleteItem = async (item: CompletedItem) => {
     if (item.type === 'research') await supabase.from('research_projects').delete().eq('id', item.id);
     else if (item.type === 'report') await supabase.from('reports').delete().eq('id', item.id);
+    else if (item.type === 'image') await supabase.from('generated_images').delete().eq('id', item.id);
     else await supabase.from('cvs').delete().eq('id', item.id);
     setItems(prev => prev.filter(i => !(i.id === item.id && i.type === item.type)));
   };
@@ -60,6 +86,7 @@ const Dashboard = () => {
   const openItem = (item: CompletedItem) => {
     if (item.type === 'research') navigate(`/project/${item.id}`);
     else if (item.type === 'report') navigate('/reports');
+    else if (item.type === 'image') navigate('/image-generator');
     else navigate('/cvs');
   };
 
@@ -68,6 +95,7 @@ const Dashboard = () => {
       research: { ar: 'بحث أكاديمي', en: 'Research' },
       report: { ar: 'تقرير', en: 'Report' },
       cv: { ar: 'سيرة ذاتية', en: 'CV' },
+      image: { ar: 'صورة مولدة', en: 'Image' },
     };
     return labels[type]?.[lang] || type;
   };
@@ -75,14 +103,14 @@ const Dashboard = () => {
   const statusVariant = (s: string) => s === 'completed' ? 'default' : s === 'generating' ? 'secondary' : 'outline';
 
   const features = [
-    { key: 'research', icon: FileText, title: lang === 'ar' ? 'البحوث الأكاديمية' : 'Academic Research', desc: lang === 'ar' ? 'إنشاء بحوث تخرج كاملة' : 'Create full graduation research', iconBg: 'bg-primary/10', iconColor: 'text-primary', onClick: () => navigate('/research') },
-    { key: 'proofreading', icon: CheckCircle, title: lang === 'ar' ? 'التدقيق اللغوي' : 'Proofreading', desc: lang === 'ar' ? 'تدقيق نصوص أكاديمية' : 'Academic text proofreading', iconBg: 'bg-accent', iconColor: 'text-primary', onClick: () => navigate('/proofreading') },
-    { key: 'report', icon: FileSpreadsheet, title: lang === 'ar' ? 'التقارير العلمية' : 'Scientific Reports', desc: lang === 'ar' ? 'إنشاء تقارير احترافية' : 'Create professional reports', iconBg: 'bg-secondary', iconColor: 'text-secondary-foreground', onClick: () => navigate('/reports') },
-    { key: 'cv', icon: UserCircle, title: lang === 'ar' ? 'السيرة الذاتية' : 'CV Builder', desc: lang === 'ar' ? 'سيرة ذاتية احترافية' : 'Professional CV', iconBg: 'bg-primary/10', iconColor: 'text-primary', onClick: () => navigate('/cvs') },
-    { key: 'summarize', icon: BookOpen, title: lang === 'ar' ? 'تلخيص النصوص' : 'Summarizer', desc: lang === 'ar' ? 'تلخيص نصوص طويلة' : 'Summarize long texts', iconBg: 'bg-accent', iconColor: 'text-primary', onClick: () => navigate('/summarizer') },
-    { key: 'translate', icon: Languages, title: lang === 'ar' ? 'الترجمة الأكاديمية' : 'Translation', desc: lang === 'ar' ? 'ترجمة أكاديمية دقيقة' : 'Precise academic translation', iconBg: 'bg-secondary', iconColor: 'text-secondary-foreground', onClick: () => navigate('/translator') },
-    { key: 'image-gen', icon: ImageIcon, title: lang === 'ar' ? 'مولد الصور' : 'Image Generator', desc: lang === 'ar' ? 'صور احترافية بالذكاء الاصطناعي' : 'AI professional images', iconBg: 'bg-primary/10', iconColor: 'text-primary', onClick: () => navigate('/image-generator') },
-    { key: 'plagiarism', icon: ShieldCheck, title: lang === 'ar' ? 'كشف الاستلال' : 'Plagiarism Detection', desc: lang === 'ar' ? 'فحص نسبة الاستلال' : 'Check plagiarism percentage', iconBg: 'bg-accent', iconColor: 'text-primary', onClick: () => navigate('/plagiarism') },
+    { key: 'research', icon: FileText, title: lang === 'ar' ? 'البحوث الأكاديمية' : 'Academic Research', onClick: () => navigate('/research') },
+    { key: 'proofreading', icon: CheckCircle, title: lang === 'ar' ? 'التدقيق اللغوي' : 'Proofreading', onClick: () => navigate('/proofreading') },
+    { key: 'report', icon: FileSpreadsheet, title: lang === 'ar' ? 'التقارير العلمية' : 'Scientific Reports', onClick: () => navigate('/reports') },
+    { key: 'cv', icon: UserCircle, title: lang === 'ar' ? 'السيرة الذاتية' : 'CV Builder', onClick: () => navigate('/cvs') },
+    { key: 'summarize', icon: BookOpen, title: lang === 'ar' ? 'تلخيص النصوص' : 'Summarizer', onClick: () => navigate('/summarizer') },
+    { key: 'translate', icon: Languages, title: lang === 'ar' ? 'الترجمة الأكاديمية' : 'Translation', onClick: () => navigate('/translator') },
+    { key: 'image-gen', icon: ImageIcon, title: lang === 'ar' ? 'مولد الصور' : 'Image Generator', onClick: () => navigate('/image-generator') },
+    { key: 'plagiarism', icon: ShieldCheck, title: lang === 'ar' ? 'كشف الاستلال' : 'Plagiarism Detection', onClick: () => navigate('/plagiarism') },
   ];
 
   const filteredItems = items.filter(item =>
@@ -122,31 +150,63 @@ const Dashboard = () => {
       <div className="container mx-auto max-w-6xl px-4 py-8 space-y-10">
         <PointsPanel />
 
-        {/* Feature Cards */}
+        {/* Feature Cards with flip animation */}
         <div>
           <div className="flex items-center gap-2 mb-5">
             <LayoutGrid className="h-5 w-5 text-primary" />
             <h2 className="text-xl font-bold">{lang === 'ar' ? 'الأدوات المتاحة' : 'Available Tools'}</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {features.map(f => (
-              <Card
-                key={f.key}
-                className="group cursor-pointer border-border/40 hover:border-primary/30 hover:shadow-lg transition-all duration-300 relative overflow-hidden"
-                onClick={f.onClick}
-              >
-                <CardContent className="p-4 flex flex-col items-center text-center gap-3">
-                  <div className={`p-3 rounded-xl ${f.iconBg} group-hover:scale-110 transition-transform duration-300`}>
-                    <f.icon className={`h-6 w-6 ${f.iconColor}`} />
+            {features.map((f, idx) => {
+              const color = FEATURE_COLORS[idx % FEATURE_COLORS.length];
+              const isFlipped = flippedCard === f.key;
+              const desc = FEATURE_DESCRIPTIONS[f.key];
+              return (
+                <div
+                  key={f.key}
+                  className="perspective-1000 cursor-pointer"
+                  style={{ perspective: '1000px' }}
+                  onMouseEnter={() => setFlippedCard(f.key)}
+                  onMouseLeave={() => setFlippedCard(null)}
+                  onClick={f.onClick}
+                >
+                  <div
+                    className="relative w-full transition-transform duration-500"
+                    style={{
+                      transformStyle: 'preserve-3d',
+                      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                      minHeight: '140px',
+                    }}
+                  >
+                    {/* Front */}
+                    <Card
+                      className={`absolute inset-0 border-border/40 ${color.border} transition-all duration-300 overflow-hidden`}
+                      style={{ backfaceVisibility: 'hidden' }}
+                    >
+                      <CardContent className="p-4 flex flex-col items-center text-center gap-3 h-full justify-center">
+                        <div className={`p-3 rounded-xl bg-gradient-to-br ${color.bg} transition-all duration-300`}>
+                          <f.icon className={`h-7 w-7 ${color.icon} transition-transform duration-300`} />
+                        </div>
+                        <h3 className="font-semibold text-sm leading-tight">{f.title}</h3>
+                      </CardContent>
+                    </Card>
+                    {/* Back */}
+                    <Card
+                      className={`absolute inset-0 border-border/40 ${color.border} bg-gradient-to-br ${color.bg} overflow-hidden`}
+                      style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                    >
+                      <CardContent className="p-4 flex flex-col items-center text-center gap-2 h-full justify-center">
+                        <f.icon className={`h-6 w-6 ${color.icon} mb-1`} />
+                        <p className="text-xs font-medium leading-relaxed">
+                          {desc ? desc[lang as 'ar' | 'en'] : f.title}
+                        </p>
+                        <ArrowUpRight className={`h-4 w-4 ${color.icon} mt-1`} />
+                      </CardContent>
+                    </Card>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm leading-tight">{f.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.desc}</p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-muted-foreground/0 group-hover:text-primary group-hover:text-muted-foreground/60 absolute top-3 left-3 transition-all" />
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 
