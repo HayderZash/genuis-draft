@@ -117,13 +117,8 @@ const ProjectEditor = () => {
 
   const handleRegenerateChapter = async (chapterIndex: number) => {
     if (!project) return;
-    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+    const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'lovable' as AIProvider;
     const apiKey = getProviderKey(provider);
-    const mergeConfig = getMergeConfig();
-    if (!mergeConfig.enabled && !apiKey) {
-      toast({ title: t('apiKeyRequired'), variant: 'destructive' });
-      return;
-    }
     setRegeneratingIndex(chapterIndex);
     setGenerationState({ active: true, step: t('regeneratingChapter'), progress: 10 });
     try {
