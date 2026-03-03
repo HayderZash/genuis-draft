@@ -27,11 +27,16 @@ async function callAI(
   const mergeConfig = getMergeConfig();
 
   if (mergeConfig.enabled && mergeConfig.providers.length > 0) {
-    return callMergeAI(mergeConfig.providers, systemPrompt, userPrompt, maxTokens, temperature);
+    try {
+      return await callMergeAI(mergeConfig.providers, systemPrompt, userPrompt, maxTokens, temperature);
+    } catch (e) {
+      console.warn('Merge AI failed, falling back to default provider:', e);
+      // Fall through to default provider
+    }
   }
 
   const { data, error } = await supabase.functions.invoke('ai-proxy', {
-    body: { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature },
+    body: { provider: 'lovable', apiKey: '', systemPrompt, userPrompt, maxTokens, temperature },
   });
 
   if (error) throw new Error(error.message || 'AI proxy call failed');
