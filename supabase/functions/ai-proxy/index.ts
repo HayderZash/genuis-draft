@@ -27,6 +27,7 @@ serve(async (req) => {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      console.log("[ai-proxy] Using Lovable AI gateway");
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -47,16 +48,22 @@ serve(async (req) => {
         const errText = await response.text().catch(() => "");
         console.error("Lovable AI error:", response.status, errText);
         if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded (429)" }), {
             status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "Payment required (402)" }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ error: `AI error: ${response.status} - ${errText.substring(0, 200)}` }), {
           status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const data = await response.json();
       content = data.choices?.[0]?.message?.content || "";
+      console.log("[ai-proxy] Lovable AI success, content length:", content.length);
 
     } else if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
