@@ -217,16 +217,7 @@ ${isLast ? 'This is the final chapter - write a comprehensive conclusion.' : ''}
 Important: Write each paragraph fully and in detail. Do not abbreviate.`;
 
     const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000, 0.7);
-    let chapterContent = cleanHtmlOutput(raw);
-
-    // Generate images if enabled
-    if (includeImages) {
-      onProgress(researchLang === 'ar' ? `🎨 توليد صور الفصل ${chapterNum}...` : `🎨 Generating chapter ${chapterNum} images...`, baseProgress + (70 / totalChapters) * 0.6);
-      chapterContent = await processImagesInContent(chapterContent, (msg) =>
-        onProgress(msg, baseProgress + (70 / totalChapters) * 0.7)
-      );
-    }
-
+    const chapterContent = cleanHtmlOutput(raw);
     content[`chapter_${i}`] = chapterContent;
     onProgress(progressStep, baseProgress + (70 / totalChapters) * 0.8);
   }
