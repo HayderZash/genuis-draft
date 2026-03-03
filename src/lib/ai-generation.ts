@@ -306,10 +306,6 @@ ${isLast ? 'Final chapter.' : ''}${refsInstruction}`;
 
   // Generate images if enabled
   if (includeImages) {
-    onProgress(researchLang === 'ar' ? '🎨 توليد الصور...' : '🎨 Generating images...', 75);
-    chapterContent = await processImagesInContent(chapterContent);
-  }
-
   onProgress(t('finalizing'), 90);
   return chapterContent;
 }

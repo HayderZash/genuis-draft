@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
@@ -13,27 +13,23 @@ interface Props {
 }
 
 export const ResearchEditor = ({ project, onContentChange }: Props) => {
-  const { t, lang } = useLanguage();
+  const { lang } = useLanguage();
+  const isExternalUpdate = useRef(false);
+  const lastContentRef = useRef<string>('');
 
-  // Build full HTML from chapters content
   const buildHtml = () => {
     if (!project.content || Object.keys(project.content).length === 0) {
       return `<p style="text-align:center;color:#999;">${lang === 'ar' ? 'لم يتم توليد المحتوى بعد. استخدم الشريط الجانبي لتوليد البحث.' : 'No content generated yet. Use the sidebar to generate research.'}</p>`;
     }
+    // If _full exists (user edited), use it directly
+    if (project.content._full) return project.content._full;
+
     let html = '';
-    // Abstract
-    if (project.content['abstract']) {
-      html += project.content['abstract'];
-    }
-    // Lists of figures/tables
-    // Chapters
-    project.chapters.forEach((ch, i) => {
-      const chContent = project.content[`chapter_${i}`] || '';
-      html += chContent;
+    if (project.content['abstract']) html += project.content['abstract'];
+    project.chapters.forEach((_, i) => {
+      html += project.content[`chapter_${i}`] || '';
     });
-    if (project.content['references']) {
-      html += project.content['references'];
-    }
+    if (project.content['references']) html += project.content['references'];
     return html;
   };
 
@@ -51,19 +47,24 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
       },
     },
     onUpdate: ({ editor }) => {
+      if (isExternalUpdate.current) return;
       onContentChange({ ...project.content, _full: editor.getHTML() });
     },
   });
 
-  // Update editor when content changes externally (e.g., after generation)
   useEffect(() => {
-    if (editor && project.content && Object.keys(project.content).length > 0) {
-      const currentHtml = editor.getHTML();
-      const newHtml = buildHtml();
-      if (currentHtml !== newHtml && !project.content._full) {
-        editor.commands.setContent(newHtml);
-      }
-    }
+    if (!editor || !project.content) return;
+    const keys = Object.keys(project.content).filter(k => k !== '_full');
+    if (keys.length === 0) return;
+
+    const newHtml = buildHtml();
+    if (newHtml === lastContentRef.current) return;
+
+    lastContentRef.current = newHtml;
+    isExternalUpdate.current = true;
+    editor.commands.setContent(newHtml);
+    // Allow onUpdate to fire after external update settles
+    setTimeout(() => { isExternalUpdate.current = false; }, 200);
   }, [project.content, editor]);
 
   return (
@@ -74,6 +75,7 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
         .research-editor h3 { font-size: 16px; font-weight: bold; text-decoration: underline; margin: 1em 0 0.3em; }
         .research-editor p { font-size: 14px; line-height: 1.8; margin: 0.5em 0; text-align: justify; }
         .research-editor .figure-caption { font-size: 12px; font-style: italic; text-align: center; margin: 0.5em 0; }
+        .research-editor img { max-width: 100%; border-radius: 8px; margin: 12px auto; display: block; }
         .research-editor { font-family: "Times New Roman", Times, serif; }
         .ProseMirror { min-height: 60vh; }
         .ProseMirror:focus { outline: none; }
