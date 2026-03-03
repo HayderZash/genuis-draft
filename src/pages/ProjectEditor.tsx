@@ -96,21 +96,59 @@ const ProjectEditor = () => {
     const mergeConfig = getMergeConfig();
     const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'lovable' as AIProvider;
     const apiKey = getProviderKey(provider);
-    setGenerationState({ active: true, step: t('analyzingTopic'), progress: 5 });
+    setGenerationState({ active: true, step: t('analyzingTopic'), progress: 5, phase: 'text' });
     try {
       const content = await generateResearch({
         apiKey,
         provider,
         project,
         lang: project.research_language as 'ar' | 'en',
-        onProgress: (step, progress) => setGenerationState({ active: true, step, progress }),
+        onProgress: (step, progress) => setGenerationState({ active: true, step, progress, phase: 'text' }),
         t,
       });
       await saveProject({ content, status: 'completed' });
-      setGenerationState({ active: false, step: '', progress: 100 });
+      setGenerationState({ active: false, step: '', progress: 100, phase: 'text' });
       toast({ title: lang === 'ar' ? 'تم توليد البحث بنجاح!' : 'Research generated successfully!' });
+
+      // Phase 2: Image Generation - scan for figure captions
+      const figureRegex = /\[(?:Figure|صورة|الشكل)\s+([\d.]+):\s*([^\]]+)\]/gi;
+      const allText = Object.values(content).join('\n');
+      const matches = [...allText.matchAll(figureRegex)];
+
+      if (matches.length > 0) {
+        const isAr = project.research_language === 'ar';
+        setGenerationState({ active: true, step: isAr ? '🎨 بدء توليد الصور...' : '🎨 Starting image generation...', progress: 0, phase: 'images' });
+
+        const updatedContent = { ...content };
+        for (let m = 0; m < matches.length; m++) {
+          const match = matches[m];
+          const description = match[2].trim();
+          const progress = ((m + 1) / matches.length) * 100;
+          setGenerationState({ active: true, step: `🎨 (${m + 1}/${matches.length}) ${description}`, progress, phase: 'images' });
+
+          try {
+            const { data } = await supabase.functions.invoke('generate-image', { body: { prompt: description } });
+            if (data?.imageUrl) {
+              const imgHtml = `<div class="generated-figure" style="text-align:center;margin:16px 0;"><img src="${data.imageUrl}" alt="${description}" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" /></div>`;
+              for (const key of Object.keys(updatedContent)) {
+                if (updatedContent[key].includes(match[0])) {
+                  updatedContent[key] = updatedContent[key].replace(match[0], imgHtml + match[0]);
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Image gen failed:', description, e);
+          }
+        }
+
+        await saveProject({ content: updatedContent });
+        toast({ title: isAr ? `تم توليد ${matches.length} صورة بنجاح!` : `${matches.length} images generated successfully!` });
+      }
+
+      setGenerationState({ active: false, step: '', progress: 100, phase: 'text' });
     } catch (err: any) {
-      setGenerationState({ active: false, step: '', progress: 0 });
+      setGenerationState({ active: false, step: '', progress: 0, phase: 'text' });
       toast({ title: err.message, variant: 'destructive' });
     }
   };
