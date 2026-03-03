@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
@@ -16,22 +16,28 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
   const { lang } = useLanguage();
   const isExternalUpdate = useRef(false);
   const lastContentRef = useRef<string>('');
+  // Keep latest project.content in ref to avoid stale closures
+  const contentRef = useRef(project.content);
+  contentRef.current = project.content;
 
-  const buildHtml = () => {
-    if (!project.content || Object.keys(project.content).length === 0) {
+  const onContentChangeRef = useRef(onContentChange);
+  onContentChangeRef.current = onContentChange;
+
+  const buildHtml = useCallback(() => {
+    const c = contentRef.current;
+    if (!c || Object.keys(c).length === 0) {
       return `<p style="text-align:center;color:#999;">${lang === 'ar' ? 'لم يتم توليد المحتوى بعد. استخدم الشريط الجانبي لتوليد البحث.' : 'No content generated yet. Use the sidebar to generate research.'}</p>`;
     }
-    // If _full exists (user edited), use it directly
-    if (project.content._full) return project.content._full;
+    if (c._full) return c._full;
 
     let html = '';
-    if (project.content['abstract']) html += project.content['abstract'];
+    if (c['abstract']) html += c['abstract'];
     project.chapters.forEach((_, i) => {
-      html += project.content[`chapter_${i}`] || '';
+      html += c[`chapter_${i}`] || '';
     });
-    if (project.content['references']) html += project.content['references'];
+    if (c['references']) html += c['references'];
     return html;
-  };
+  }, [lang, project.chapters]);
 
   const editor = useEditor({
     extensions: [
@@ -48,7 +54,8 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
     },
     onUpdate: ({ editor }) => {
       if (isExternalUpdate.current) return;
-      onContentChange({ ...project.content, _full: editor.getHTML() });
+      // Use ref to get latest content, not stale closure
+      onContentChangeRef.current({ ...contentRef.current, _full: editor.getHTML() });
     },
   });
 
@@ -60,12 +67,12 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
     const newHtml = buildHtml();
     if (newHtml === lastContentRef.current) return;
 
+    console.log('[Editor] Updating content, keys:', keys.join(', '));
     lastContentRef.current = newHtml;
     isExternalUpdate.current = true;
     editor.commands.setContent(newHtml);
-    // Allow onUpdate to fire after external update settles
-    setTimeout(() => { isExternalUpdate.current = false; }, 200);
-  }, [project.content, editor]);
+    setTimeout(() => { isExternalUpdate.current = false; }, 500);
+  }, [project.content, editor, buildHtml]);
 
   return (
     <div className="bg-background">

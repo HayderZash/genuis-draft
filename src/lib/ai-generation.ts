@@ -2,7 +2,7 @@ import type { ProjectData } from '@/pages/ProjectEditor';
 import type { TranslationKey } from '@/i18n/translations';
 import { supabase } from '@/integrations/supabase/client';
 import type { AIProvider } from '@/components/SettingsDialog';
-import { getMergeConfig, getProviderKey, PROVIDER_KEY_MAP } from '@/components/SettingsDialog';
+import { getMergeConfig, getProviderKey } from '@/components/SettingsDialog';
 
 interface GenerateParams {
   apiKey: string;
@@ -15,58 +15,99 @@ interface GenerateParams {
 
 const WORDS_PER_PAGE = 250;
 
-/** Route AI call through single provider proxy */
+/** Delay helper */
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** Call AI with retry logic for rate limits */
 async function callAI(
-  provider: AIProvider,
-  apiKey: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
-  temperature: number
+  temperature: number,
+  retries = 3
 ): Promise<string> {
+  // Try merge mode first
   const mergeConfig = getMergeConfig();
-
   if (mergeConfig.enabled && mergeConfig.providers.length > 0) {
     try {
-      return await callMergeAI(mergeConfig.providers, systemPrompt, userPrompt, maxTokens, temperature);
+      const providers = mergeConfig.providers
+        .map(p => ({ provider: p, apiKey: getProviderKey(p) }))
+        .filter(p => p.apiKey);
+      
+      if (providers.length > 0) {
+        const { data, error } = await supabase.functions.invoke('ai-merge-proxy', {
+          body: { providers, systemPrompt, userPrompt, maxTokens, temperature, mergeLanguage: systemPrompt.includes('العربية') ? 'ar' : 'en' },
+        });
+        if (!error && data?.content) {
+          console.log('[AI] Merge mode succeeded');
+          return data.content;
+        }
+        console.warn('[AI] Merge mode failed, falling back to Lovable AI:', error?.message || data?.error);
+      }
     } catch (e) {
-      console.warn('Merge AI failed, falling back to default provider:', e);
-      // Fall through to default provider
+      console.warn('[AI] Merge exception, falling back:', e);
     }
   }
 
-  const { data, error } = await supabase.functions.invoke('ai-proxy', {
-    body: { provider: 'lovable', apiKey: '', systemPrompt, userPrompt, maxTokens, temperature },
-  });
+  // Fallback: use Lovable AI directly (always available)
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`[AI] Lovable AI attempt ${attempt}/${retries}`);
+      
+      const { data, error } = await supabase.functions.invoke('ai-proxy', {
+        body: { provider: 'lovable', apiKey: '', systemPrompt, userPrompt, maxTokens, temperature },
+      });
 
-  if (error) throw new Error(error.message || 'AI proxy call failed');
-  if (data?.error) throw new Error(data.error);
-  return data?.content || '';
-}
+      if (error) {
+        const errMsg = error.message || 'AI proxy call failed';
+        console.error(`[AI] Invoke error (attempt ${attempt}):`, errMsg);
+        
+        // Check for rate limit
+        if (errMsg.includes('429') || errMsg.includes('rate') || errMsg.includes('Rate')) {
+          if (attempt < retries) {
+            const waitTime = attempt * 5000; // 5s, 10s, 15s
+            console.log(`[AI] Rate limited, waiting ${waitTime}ms...`);
+            await delay(waitTime);
+            continue;
+          }
+        }
+        throw new Error(errMsg);
+      }
 
-/** Call merge proxy with multiple providers */
-async function callMergeAI(
-  providerNames: AIProvider[],
-  systemPrompt: string,
-  userPrompt: string,
-  maxTokens: number,
-  temperature: number
-): Promise<string> {
-  const providers = providerNames
-    .map(p => ({ provider: p, apiKey: getProviderKey(p) }))
-    .filter(p => p.apiKey);
+      if (data?.error) {
+        console.error(`[AI] API error (attempt ${attempt}):`, data.error);
+        
+        if (data.error.includes('429') || data.error.includes('rate') || data.error.includes('Rate')) {
+          if (attempt < retries) {
+            const waitTime = attempt * 5000;
+            console.log(`[AI] Rate limited, waiting ${waitTime}ms...`);
+            await delay(waitTime);
+            continue;
+          }
+        }
+        throw new Error(data.error);
+      }
 
-  if (providers.length === 0) throw new Error('No API keys configured for merge providers');
+      const content = data?.content || '';
+      if (!content) {
+        console.error(`[AI] Empty content (attempt ${attempt})`);
+        if (attempt < retries) {
+          await delay(2000);
+          continue;
+        }
+        throw new Error('AI returned empty content');
+      }
 
-  const isAr = systemPrompt.includes('العربية') || systemPrompt.includes('عربي');
+      console.log(`[AI] Success, content length: ${content.length}`);
+      return content;
+    } catch (e: any) {
+      if (attempt === retries) throw e;
+      console.warn(`[AI] Attempt ${attempt} failed:`, e.message);
+      await delay(attempt * 3000);
+    }
+  }
 
-  const { data, error } = await supabase.functions.invoke('ai-merge-proxy', {
-    body: { providers, systemPrompt, userPrompt, maxTokens, temperature, mergeLanguage: isAr ? 'ar' : 'en' },
-  });
-
-  if (error) throw new Error(error.message || 'Merge proxy call failed');
-  if (data?.error) throw new Error(data.error);
-  return data?.content || '';
+  throw new Error('All AI attempts failed');
 }
 
 /** Strip markdown code fences from AI output */
@@ -78,41 +119,7 @@ function cleanHtmlOutput(text: string): string {
     .trim();
 }
 
-/** Generate images for figure captions in HTML content */
-async function processImagesInContent(
-  html: string,
-  onProgress?: (msg: string) => void
-): Promise<string> {
-  // Match figure captions like [Figure 1.2: Description] or [الشكل 1.2: الوصف]
-  const captionRegex = /\[(?:Figure|الشكل)\s+[\d.]+:\s*([^\]]+)\]/gi;
-  const matches = [...html.matchAll(captionRegex)];
-
-  if (matches.length === 0) return html;
-
-  let result = html;
-  for (const match of matches) {
-    const description = match[1].trim();
-    onProgress?.(`🎨 ${description}`);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { prompt: description },
-      });
-
-      if (error || !data?.imageUrl) continue;
-
-      const imgHtml = `<div class="generated-figure" style="text-align:center;margin:16px 0;"><img src="${data.imageUrl}" alt="${description}" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" /></div>`;
-      // Insert image before the caption
-      result = result.replace(match[0], imgHtml + match[0]);
-    } catch (e) {
-      console.error('Image generation failed for:', description, e);
-    }
-  }
-
-  return result;
-}
-
-export async function generateResearch({ apiKey, provider, project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
+export async function generateResearch({ project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
   const content: Record<string, string> = {};
   const totalChapters = project.chapters.length;
   const researchLang = project.research_language || lang;
@@ -126,12 +133,22 @@ export async function generateResearch({ apiKey, provider, project, lang, onProg
   const abstractUserPrompt = researchLang === 'ar'
     ? `اكتب ملخصاً أكاديمياً (Abstract) لبحث بعنوان "${project.title}". يجب أن يكون الملخص باللغة العربية ويلخص أهداف البحث ومنهجيته وأهم نتائجه في 200-300 كلمة.`
     : `Write an academic abstract for a research paper titled "${project.title}". Summarize objectives, methodology, and key findings in 200-300 words.`;
-  const rawAbstract = await callAI(provider, apiKey, abstractSystemPrompt, abstractUserPrompt, 1500, 0.5);
-  content['abstract'] = cleanHtmlOutput(rawAbstract);
+  
+  try {
+    const rawAbstract = await callAI(abstractSystemPrompt, abstractUserPrompt, 1500, 0.5);
+    content['abstract'] = cleanHtmlOutput(rawAbstract);
+    console.log('[Gen] Abstract done');
+  } catch (e: any) {
+    console.error('[Gen] Abstract failed:', e.message);
+    throw new Error(`Abstract generation failed: ${e.message}`);
+  }
 
   onProgress(t('analyzingTopic'), 5);
 
-  // Generate each chapter section by section
+  // Add delay between API calls to avoid rate limits
+  await delay(2000);
+
+  // Generate each chapter
   for (let i = 0; i < totalChapters; i++) {
     const chapterName = researchLang === 'ar' ? project.chapters[i].nameAr : project.chapters[i].name;
     const progressStep = `${t('draftingChapter')} ${i + 1}: ${chapterName}`;
@@ -221,22 +238,41 @@ ${isLast ? 'This is the final chapter - write a comprehensive conclusion.' : ''}
 
 Important: Write each paragraph fully and in detail. Do not abbreviate.`;
 
-    const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000, 0.7);
-    const chapterContent = cleanHtmlOutput(raw);
-    content[`chapter_${i}`] = chapterContent;
-    onProgress(progressStep, baseProgress + (70 / totalChapters) * 0.8);
+    try {
+      const raw = await callAI(systemPrompt, userPrompt, 8000, 0.7);
+      content[`chapter_${i}`] = cleanHtmlOutput(raw);
+      onProgress(progressStep, baseProgress + (70 / totalChapters) * 0.8);
+      console.log(`[Gen] Chapter ${i + 1} done, length: ${content[`chapter_${i}`].length}`);
+    } catch (e: any) {
+      console.error(`[Gen] Chapter ${i + 1} failed:`, e.message);
+      throw new Error(`Chapter ${i + 1} failed: ${e.message}`);
+    }
+
+    // Delay between chapters to avoid rate limits
+    if (i < totalChapters - 1) {
+      await delay(3000);
+    }
   }
 
   // Generate references
   onProgress(t('formattingCitations'), 85);
+  await delay(2000);
+  
   const refCount = project.reference_count || 10;
   const refsSystemPrompt = researchLang === 'ar' ? 'أنت خبير أكاديمي. اكتب بتنسيق HTML فقط.' : 'You are an academic expert. Write in HTML format only.';
   const refsPrompt = researchLang === 'ar'
     ? `بناءً على بحث بعنوان "${project.title}" حول "${project.abstract}", اكتب قائمة مراجع مرقمة تحتوي على ${refCount} مصدر بالضبط. رقم كل مصدر [1]، [2]، إلخ. استخدم <h1> للعنوان و <p> لكل مرجع. ${project.custom_references ? `تضمين: ${project.custom_references}` : ''}`
     : `Based on research titled "${project.title}" about "${project.abstract}", write a numbered reference list with EXACTLY ${refCount} references. Number [1], [2], etc. Use <h1> for title and <p> for each reference. ${project.custom_references ? `Include: ${project.custom_references}` : ''}`;
 
-  const rawRefs = await callAI(provider, apiKey, refsSystemPrompt, refsPrompt, 2000, 0.5);
-  content['references'] = cleanHtmlOutput(rawRefs);
+  try {
+    const rawRefs = await callAI(refsSystemPrompt, refsPrompt, 2000, 0.5);
+    content['references'] = cleanHtmlOutput(rawRefs);
+    console.log('[Gen] References done');
+  } catch (e: any) {
+    console.error('[Gen] References failed:', e.message);
+    // Don't fail the whole generation for references
+    content['references'] = researchLang === 'ar' ? '<h1>المراجع</h1><p>لم يتم توليد المراجع.</p>' : '<h1>References</h1><p>References could not be generated.</p>';
+  }
 
   onProgress(t('generatingToc'), 92);
   onProgress(t('finalizing'), 98);
@@ -244,7 +280,7 @@ Important: Write each paragraph fully and in detail. Do not abbreviate.`;
 }
 
 /** Regenerate a single chapter */
-export async function regenerateChapter({ apiKey, provider, project, lang, chapterIndex, onProgress, t }: GenerateParams & { chapterIndex: number; }): Promise<string> {
+export async function regenerateChapter({ project, lang, chapterIndex, onProgress, t }: GenerateParams & { chapterIndex: number; }): Promise<string> {
   const researchLang = project.research_language || lang;
   const chapterName = researchLang === 'ar' ? project.chapters[chapterIndex].nameAr : project.chapters[chapterIndex].name;
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 20);
@@ -306,7 +342,7 @@ Write paragraph by paragraph in full detail. Use clear subsections.
 ${isLast ? 'Final chapter.' : ''}${refsInstruction}`;
 
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 50);
-  const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000, 0.7);
+  const raw = await callAI(systemPrompt, userPrompt, 8000, 0.7);
   const chapterContent = cleanHtmlOutput(raw);
 
   onProgress(t('finalizing'), 90);
