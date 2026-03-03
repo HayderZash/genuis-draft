@@ -158,22 +158,22 @@ const ProjectEditor = () => {
     const provider = (localStorage.getItem('ai_provider') as AIProvider) || 'lovable' as AIProvider;
     const apiKey = getProviderKey(provider);
     setRegeneratingIndex(chapterIndex);
-    setGenerationState({ active: true, step: t('regeneratingChapter'), progress: 10 });
+    setGenerationState({ active: true, step: t('regeneratingChapter'), progress: 10, phase: 'text' });
     try {
       const chapterContent = await regenerateChapter({
         apiKey, provider, project,
         lang: project.research_language as 'ar' | 'en',
         chapterIndex,
-        onProgress: (step, progress) => setGenerationState({ active: true, step, progress }),
+        onProgress: (step, progress) => setGenerationState({ active: true, step, progress, phase: 'text' }),
         t,
       });
       const newContent = { ...project.content, [`chapter_${chapterIndex}`]: chapterContent };
       delete newContent._full;
       await saveProject({ content: newContent });
-      setGenerationState({ active: false, step: '', progress: 100 });
+      setGenerationState({ active: false, step: '', progress: 100, phase: 'text' });
       toast({ title: lang === 'ar' ? 'تم إعادة توليد الفصل بنجاح!' : 'Chapter regenerated successfully!' });
     } catch (err: any) {
-      setGenerationState({ active: false, step: '', progress: 0 });
+      setGenerationState({ active: false, step: '', progress: 0, phase: 'text' });
       toast({ title: err.message, variant: 'destructive' });
     } finally {
       setRegeneratingIndex(-1);
