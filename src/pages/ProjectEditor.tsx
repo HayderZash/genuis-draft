@@ -220,7 +220,7 @@ const ProjectEditor = () => {
 
         {/* Generation Progress */}
         {generationState.active && (
-          <GenerationProgress step={generationState.step} progress={generationState.progress} />
+          <GenerationProgress step={generationState.step} progress={generationState.progress} phase={generationState.phase} />
         )}
 
         {/* Editor */}

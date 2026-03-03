@@ -14,7 +14,7 @@ export const GenerationProgress = ({ step, progress, phase = 'text' }: Props) =>
     <div className="px-6 py-3 border-b bg-muted/30">
       <div className="flex items-center gap-2 mb-1">
         {isImagePhase ? (
-          <ImageIcon className="h-4 w-4 text-purple-500 animate-pulse" />
+          <ImageIcon className="h-4 w-4 text-accent-foreground animate-pulse" />
         ) : (
           <FileText className="h-4 w-4 text-primary animate-pulse" />
         )}
