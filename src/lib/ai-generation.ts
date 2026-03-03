@@ -302,10 +302,8 @@ ${isLast ? 'Final chapter.' : ''}${refsInstruction}`;
 
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 50);
   const raw = await callAI(provider, apiKey, systemPrompt, userPrompt, 8000, 0.7);
-  let chapterContent = cleanHtmlOutput(raw);
+  const chapterContent = cleanHtmlOutput(raw);
 
-  // Generate images if enabled
-  if (includeImages) {
   onProgress(t('finalizing'), 90);
   return chapterContent;
 }
