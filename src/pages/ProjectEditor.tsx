@@ -46,8 +46,8 @@ const ProjectEditor = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
-  const [generationState, setGenerationState] = useState<{ active: boolean; step: string; progress: number }>({
-    active: false, step: '', progress: 0,
+  const [generationState, setGenerationState] = useState<{ active: boolean; step: string; progress: number; phase: 'text' | 'images' }>({
+    active: false, step: '', progress: 0, phase: 'text',
   });
   const [regeneratingIndex, setRegeneratingIndex] = useState<number>(-1);
 
