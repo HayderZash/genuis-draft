@@ -35,6 +35,8 @@ export interface ProjectData {
   include_toc: boolean;
   include_list_of_tables: boolean;
   include_list_of_figures: boolean;
+  include_images: boolean;
+  include_data_tables: boolean;
 }
 
 const ProjectEditor = () => {
