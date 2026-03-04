@@ -292,8 +292,8 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
   const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
   const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
-  const includeImages = (project as any).include_images;
-  const includeTables = (project as any).include_data_tables;
+  const includeImages = project.include_images;
+  const includeTables = project.include_data_tables;
 
   const figureInstruction = includeImages
     ? (researchLang === 'ar'
