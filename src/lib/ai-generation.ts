@@ -123,7 +123,7 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
   const content: Record<string, string> = {};
   const totalChapters = project.chapters.length;
   const researchLang = project.research_language || lang;
-  const includeImages = (project as any).include_images;
+  const includeImages = project.include_images;
 
   // Generate Abstract
   onProgress(t('generatingAbstract'), 3);
