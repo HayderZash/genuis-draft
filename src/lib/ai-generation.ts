@@ -162,7 +162,7 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
     const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
     const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
-    const includeTables = (project as any).include_data_tables;
+    const includeTables = project.include_data_tables;
 
     const figureInstruction = includeImages
       ? (researchLang === 'ar'
