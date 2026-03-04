@@ -120,8 +120,8 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         <div className="flex items-center gap-2">
           <Checkbox
             id="include_images"
-            checked={(project as any).include_images || false}
-            onCheckedChange={(v) => onUpdate({ include_images: !!v } as any)}
+            checked={project.include_images || false}
+            onCheckedChange={(v) => onUpdate({ include_images: !!v })}
           />
           <label htmlFor="include_images" className="text-sm cursor-pointer">
             {lang === 'ar' ? 'إضافة صور توضيحية مع عناوين' : 'Add illustrative images with captions'}
@@ -130,8 +130,8 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         <div className="flex items-center gap-2">
           <Checkbox
             id="include_data_tables"
-            checked={(project as any).include_data_tables || false}
-            onCheckedChange={(v) => onUpdate({ include_data_tables: !!v } as any)}
+            checked={project.include_data_tables || false}
+            onCheckedChange={(v) => onUpdate({ include_data_tables: !!v })}
           />
           <label htmlFor="include_data_tables" className="text-sm cursor-pointer">
             {lang === 'ar' ? 'إضافة جداول بيانات' : 'Add data tables'}

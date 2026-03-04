@@ -35,6 +35,8 @@ export interface ProjectData {
   include_toc: boolean;
   include_list_of_tables: boolean;
   include_list_of_figures: boolean;
+  include_images: boolean;
+  include_data_tables: boolean;
 }
 
 const ProjectEditor = () => {
@@ -73,6 +75,8 @@ const ProjectEditor = () => {
       include_toc: (data as any).include_toc ?? true,
       include_list_of_tables: (data as any).include_list_of_tables ?? false,
       include_list_of_figures: (data as any).include_list_of_figures ?? false,
+      include_images: data.include_images ?? false,
+      include_data_tables: data.include_data_tables ?? false,
     });
     setLoading(false);
   }, [id, navigate]);

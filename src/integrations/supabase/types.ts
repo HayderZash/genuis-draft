@@ -183,6 +183,8 @@ export type Database = {
           created_at: string
           custom_references: string | null
           id: string
+          include_images: boolean
+          include_tables: boolean
           margin_bottom: number
           margin_left: number
           margin_right: number
@@ -203,6 +205,8 @@ export type Database = {
           created_at?: string
           custom_references?: string | null
           id?: string
+          include_images?: boolean
+          include_tables?: boolean
           margin_bottom?: number
           margin_left?: number
           margin_right?: number
@@ -223,6 +227,8 @@ export type Database = {
           created_at?: string
           custom_references?: string | null
           id?: string
+          include_images?: boolean
+          include_tables?: boolean
           margin_bottom?: number
           margin_left?: number
           margin_right?: number
@@ -249,6 +255,8 @@ export type Database = {
           created_at: string
           custom_references: string | null
           id: string
+          include_data_tables: boolean
+          include_images: boolean
           include_list_of_figures: boolean
           include_list_of_tables: boolean
           include_toc: boolean
@@ -274,6 +282,8 @@ export type Database = {
           created_at?: string
           custom_references?: string | null
           id?: string
+          include_data_tables?: boolean
+          include_images?: boolean
           include_list_of_figures?: boolean
           include_list_of_tables?: boolean
           include_toc?: boolean
@@ -299,6 +309,8 @@ export type Database = {
           created_at?: string
           custom_references?: string | null
           id?: string
+          include_data_tables?: boolean
+          include_images?: boolean
           include_list_of_figures?: boolean
           include_list_of_tables?: boolean
           include_toc?: boolean
