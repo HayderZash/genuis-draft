@@ -78,6 +78,7 @@ const ProjectEditor = () => {
       include_list_of_figures: (data as any).include_list_of_figures ?? false,
       include_images: data.include_images ?? false,
       include_data_tables: data.include_data_tables ?? false,
+      image_quality: (data as any).image_quality || 'standard',
     });
     setLoading(false);
   }, [id, navigate]);
