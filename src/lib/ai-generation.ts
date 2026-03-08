@@ -303,8 +303,12 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
 
   const figureInstruction = includeImages
     ? (researchLang === 'ar'
-      ? `أضف عناوين أشكال توضيحية بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p>.`
-      : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p>.`)
+      ? `مهم جداً: أضف 3-5 عناوين صور توضيحية موزعة بين الفقرات بالتنسيق:
+<p class="figure-caption">[Figure ${chapterNum}.1: وصف تفصيلي بالإنجليزية]</p>
+ضع عناوين الصور بين الفقرات وليس في نهاية الفصل.`
+      : `CRITICAL: Include 3-5 figure captions distributed between paragraphs:
+<p class="figure-caption">[Figure ${chapterNum}.1: Detailed description]</p>
+Place them BETWEEN paragraphs, not at the end.`)
     : '';
 
   const tableInstruction = includeTables
