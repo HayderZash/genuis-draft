@@ -166,8 +166,14 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
 
     const figureInstruction = includeImages
       ? (researchLang === 'ar'
-        ? `أضف عناوين أشكال توضيحية بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p>.`
-        : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p>.`)
+        ? `مهم جداً: يجب أن تضيف ما لا يقل عن 3 إلى 5 عناوين صور توضيحية في هذا الفصل، موزعة بين الفقرات (ليس في النهاية فقط). كل عنوان صورة يجب أن يكون بالتنسيق التالي بالضبط:
+<p class="figure-caption">[Figure ${chapterNum}.1: وصف تفصيلي للصورة باللغة الإنجليزية]</p>
+<p class="figure-caption">[Figure ${chapterNum}.2: وصف تفصيلي آخر]</p>
+يجب أن يصف كل عنوان صورة عنصراً مرئياً مرتبطاً بالمحتوى مثل: مخطط، رسم بياني، صورة توضيحية، هيكل تنظيمي، خريطة مفاهيمية، إلخ. ضع عناوين الصور بين الفقرات وليس في نهاية الفصل.`
+        : `CRITICAL: You MUST include at least 3 to 5 figure captions in this chapter, distributed between paragraphs (NOT only at the end). Each figure caption MUST follow this exact format:
+<p class="figure-caption">[Figure ${chapterNum}.1: Detailed description of the image]</p>
+<p class="figure-caption">[Figure ${chapterNum}.2: Another detailed description]</p>
+Each caption must describe a visual element related to the content such as: diagram, chart, illustration, organizational structure, concept map, flowchart, etc. Place figure captions BETWEEN paragraphs, not at the end of the chapter.`)
       : '';
 
     const tableInstruction = includeTables
@@ -297,8 +303,12 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
 
   const figureInstruction = includeImages
     ? (researchLang === 'ar'
-      ? `أضف عناوين أشكال توضيحية بتنسيق <p class="figure-caption"><em>[الشكل ${chapterNum}.X: الوصف]</em></p>.`
-      : `Insert figure captions as <p class="figure-caption"><em>[Figure ${chapterNum}.X: Description]</em></p>.`)
+      ? `مهم جداً: أضف 3-5 عناوين صور توضيحية موزعة بين الفقرات بالتنسيق:
+<p class="figure-caption">[Figure ${chapterNum}.1: وصف تفصيلي بالإنجليزية]</p>
+ضع عناوين الصور بين الفقرات وليس في نهاية الفصل.`
+      : `CRITICAL: Include 3-5 figure captions distributed between paragraphs:
+<p class="figure-caption">[Figure ${chapterNum}.1: Detailed description]</p>
+Place them BETWEEN paragraphs, not at the end.`)
     : '';
 
   const tableInstruction = includeTables

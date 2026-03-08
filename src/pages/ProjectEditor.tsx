@@ -115,39 +115,65 @@ const ProjectEditor = () => {
       toast({ title: lang === 'ar' ? 'تم توليد البحث بنجاح!' : 'Research generated successfully!' });
 
       // Phase 2: Image Generation - scan for figure captions
-      const figureRegex = /\[(?:Figure|صورة|الشكل)\s+([\d.]+):\s*([^\]]+)\]/gi;
+      const figureRegex = /\[Figure\s+([\d.]+):\s*([^\]]+)\]/gi;
       const allText = Object.values(content).join('\n');
       const matches = [...allText.matchAll(figureRegex)];
+      
+      console.log('[ImageGen] Found figure captions:', matches.length);
+      matches.forEach((m, i) => console.log(`[ImageGen] Caption ${i + 1}: ${m[0]}`));
 
       if (matches.length > 0) {
         const isAr = project.research_language === 'ar';
-        setGenerationState({ active: true, step: isAr ? '🎨 بدء توليد الصور...' : '🎨 Starting image generation...', progress: 0, phase: 'images' });
+        setGenerationState({ active: true, step: isAr ? `🎨 بدء توليد ${matches.length} صورة...` : `🎨 Starting generation of ${matches.length} images...`, progress: 0, phase: 'images' });
 
         const updatedContent = { ...content };
+        let successCount = 0;
+        
         for (let m = 0; m < matches.length; m++) {
           const match = matches[m];
           const description = match[2].trim();
           const progress = ((m + 1) / matches.length) * 100;
-          setGenerationState({ active: true, step: `🎨 (${m + 1}/${matches.length}) ${description}`, progress, phase: 'images' });
+          setGenerationState({ active: true, step: isAr ? `🎨 توليد صورة (${m + 1}/${matches.length}): ${description.substring(0, 50)}...` : `🎨 (${m + 1}/${matches.length}) ${description.substring(0, 50)}...`, progress, phase: 'images' });
 
           try {
-            const { data } = await supabase.functions.invoke('generate-image', { body: { prompt: description } });
+            console.log(`[ImageGen] Generating image ${m + 1}/${matches.length}: ${description}`);
+            const { data, error } = await supabase.functions.invoke('generate-image', { body: { prompt: description } });
+            
+            if (error) {
+              console.error(`[ImageGen] Edge function error for "${description}":`, error);
+              continue;
+            }
+            
             if (data?.imageUrl) {
+              console.log(`[ImageGen] Success! URL: ${data.imageUrl.substring(0, 80)}...`);
               const imgHtml = `<div class="generated-figure" style="text-align:center;margin:16px 0;"><img src="${data.imageUrl}" alt="${description}" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" /></div>`;
+              // Insert image ABOVE the caption in the correct chapter
               for (const key of Object.keys(updatedContent)) {
                 if (updatedContent[key].includes(match[0])) {
                   updatedContent[key] = updatedContent[key].replace(match[0], imgHtml + match[0]);
                   break;
                 }
               }
+              successCount++;
+            } else {
+              console.error(`[ImageGen] No imageUrl in response for "${description}":`, JSON.stringify(data).substring(0, 200));
             }
           } catch (e) {
-            console.error('Image gen failed:', description, e);
+            console.error('[ImageGen] Failed:', description, e);
+          }
+
+          // Small delay between image generations
+          if (m < matches.length - 1) {
+            await new Promise(r => setTimeout(r, 2000));
           }
         }
 
-        await saveProject({ content: updatedContent });
-        toast({ title: isAr ? `تم توليد ${matches.length} صورة بنجاح!` : `${matches.length} images generated successfully!` });
+        if (successCount > 0) {
+          await saveProject({ content: updatedContent });
+          toast({ title: isAr ? `تم توليد ${successCount} من ${matches.length} صورة بنجاح!` : `${successCount} of ${matches.length} images generated successfully!` });
+        } else {
+          toast({ title: isAr ? 'لم يتم توليد أي صور' : 'No images were generated', variant: 'destructive' });
+        }
       }
 
       setGenerationState({ active: false, step: '', progress: 100, phase: 'text' });
