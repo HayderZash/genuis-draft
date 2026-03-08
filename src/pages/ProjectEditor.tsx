@@ -139,7 +139,7 @@ const ProjectEditor = () => {
 
           try {
             console.log(`[ImageGen] Generating image ${m + 1}/${matches.length}: ${description}`);
-            const { data, error } = await supabase.functions.invoke('generate-image', { body: { prompt: description } });
+            const { data, error } = await supabase.functions.invoke('generate-image', { body: { prompt: description, model: project.image_quality === 'high' ? 'pro' : 'standard' } });
             
             if (error) {
               console.error(`[ImageGen] Edge function error for "${description}":`, error);
