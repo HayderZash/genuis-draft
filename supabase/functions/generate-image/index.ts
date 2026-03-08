@@ -8,7 +8,7 @@ const corsHeaders = {
 
 async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise<string | null> {
   console.log("[generate-image] Using direct Gemini API");
-  const model = "gemini-2.0-flash-exp";
+  const model = "gemini-2.0-flash-exp-image-generation";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   
   const response = await fetch(url, {
