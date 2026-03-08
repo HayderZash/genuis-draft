@@ -139,6 +139,19 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         </div>
       </div>
 
+      {project.include_images && (
+        <div className="space-y-2">
+          <Label>{lang === 'ar' ? 'جودة الصور' : 'Image Quality'}</Label>
+          <Select value={project.image_quality || 'standard'} onValueChange={(v) => onUpdate({ image_quality: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="standard">{lang === 'ar' ? 'عادية (أسرع)' : 'Standard (Faster)'}</SelectItem>
+              <SelectItem value="high">{lang === 'ar' ? 'عالية الجودة (أبطأ)' : 'High Quality (Slower)'}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <Button onClick={onGenerate} disabled={generating || !project.title} className="w-full gap-2">
         {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
         {t('generateResearch')}

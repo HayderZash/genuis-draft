@@ -255,6 +255,7 @@ export type Database = {
           created_at: string
           custom_references: string | null
           id: string
+          image_quality: string
           include_data_tables: boolean
           include_images: boolean
           include_list_of_figures: boolean
@@ -282,6 +283,7 @@ export type Database = {
           created_at?: string
           custom_references?: string | null
           id?: string
+          image_quality?: string
           include_data_tables?: boolean
           include_images?: boolean
           include_list_of_figures?: boolean
@@ -309,6 +311,7 @@ export type Database = {
           created_at?: string
           custom_references?: string | null
           id?: string
+          image_quality?: string
           include_data_tables?: boolean
           include_images?: boolean
           include_list_of_figures?: boolean
