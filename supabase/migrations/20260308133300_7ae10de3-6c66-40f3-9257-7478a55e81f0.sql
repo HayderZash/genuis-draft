@@ -1,0 +1,1 @@
+ALTER TABLE public.research_projects ADD COLUMN IF NOT EXISTS image_quality text NOT NULL DEFAULT 'standard';
