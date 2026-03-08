@@ -104,15 +104,22 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SERVER_GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
     let base64Url: string | null = null;
     let usedModel = "gemini-direct";
 
-    // Strategy 1: Try user's Gemini API key directly (no credit limits)
+    // Strategy 1: Try user's Gemini API key directly
     if (geminiApiKey) {
       base64Url = await generateWithGeminiDirect(geminiApiKey, prompt);
     }
 
-    // Strategy 2: Fallback to Lovable Gateway
+    // Strategy 2: Try server-side Gemini API key
+    if (!base64Url && SERVER_GEMINI_KEY) {
+      console.log("[generate-image] Using server-side GEMINI_API_KEY");
+      base64Url = await generateWithGeminiDirect(SERVER_GEMINI_KEY, prompt);
+    }
+
+    // Strategy 3: Fallback to Lovable Gateway
     if (!base64Url && LOVABLE_API_KEY) {
       usedModel = modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
       base64Url = await generateWithLovableGateway(LOVABLE_API_KEY, prompt, modelKey || "standard");
