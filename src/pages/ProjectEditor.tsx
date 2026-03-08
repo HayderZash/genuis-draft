@@ -37,6 +37,7 @@ export interface ProjectData {
   include_list_of_figures: boolean;
   include_images: boolean;
   include_data_tables: boolean;
+  image_quality: string;
 }
 
 const ProjectEditor = () => {
