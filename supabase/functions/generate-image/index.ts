@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,8 +24,9 @@ serve(async (req) => {
       });
     }
 
-    // Use Lovable AI image generation model
     const selectedModel = modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
+
+    console.log(`[generate-image] Generating with model: ${selectedModel}, prompt: ${prompt.substring(0, 100)}`);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -37,7 +39,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: `Generate an image: ${prompt}`,
+            content: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.`,
           },
         ],
         modalities: ["image", "text"],
@@ -63,18 +65,54 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const base64Url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
+    if (!base64Url) {
       console.error("No image in response:", JSON.stringify(data).slice(0, 500));
       return new Response(JSON.stringify({ error: "No image generated" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ imageUrl, model: selectedModel }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Upload to Supabase Storage to avoid huge base64 in content
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      // Extract base64 data
+      const base64Data = base64Url.replace(/^data:image\/\w+;base64,/, "");
+      const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      
+      const fileName = `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`;
+      const filePath = `generated/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("research-images")
+        .upload(filePath, imageBytes, { contentType: "image/png", upsert: false });
+
+      if (uploadError) {
+        console.error("Storage upload failed:", uploadError.message);
+        // Fallback to base64 URL
+        return new Response(JSON.stringify({ imageUrl: base64Url, model: selectedModel }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: publicUrlData } = supabase.storage.from("research-images").getPublicUrl(filePath);
+      const publicUrl = publicUrlData.publicUrl;
+
+      console.log(`[generate-image] Uploaded to storage: ${publicUrl}`);
+
+      return new Response(JSON.stringify({ imageUrl: publicUrl, model: selectedModel }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (storageErr) {
+      console.error("Storage error, falling back to base64:", storageErr);
+      return new Response(JSON.stringify({ imageUrl: base64Url, model: selectedModel }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } catch (e) {
     console.error("generate-image error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
