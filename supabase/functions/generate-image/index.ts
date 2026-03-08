@@ -7,35 +7,48 @@ const corsHeaders = {
 };
 
 async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise<string | null> {
-  console.log("[generate-image] Using direct Gemini API");
-  const model = "gemini-2.0-flash-exp";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.` }] }],
-      generationConfig: {
-        responseModalities: ["IMAGE", "TEXT"],
-      },
-    }),
-  });
+  // Try multiple model names for compatibility
+  const models = [
+    "gemini-2.5-flash",
+    "gemini-3.1-flash-image-preview",
+    "gemini-3-pro-image-preview",
+  ];
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    console.error("[generate-image] Gemini direct error:", response.status, errText.substring(0, 300));
-    return null;
-  }
+  for (const model of models) {
+    console.log(`[generate-image] Trying Gemini model: ${model}`);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.` }] }],
+          generationConfig: {
+            responseModalities: ["IMAGE", "TEXT"],
+          },
+        }),
+      });
 
-  const data = await response.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  for (const part of parts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error(`[generate-image] Model ${model} error: ${response.status} ${errText.substring(0, 300)}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData) {
+          console.log(`[generate-image] Success with model: ${model}`);
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
+      }
+      console.error(`[generate-image] No image in response from ${model}`);
+    } catch (e) {
+      console.error(`[generate-image] Exception with ${model}:`, e);
     }
   }
-  console.error("[generate-image] No image in Gemini direct response");
   return null;
 }
 
@@ -59,7 +72,6 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, modelK
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
     console.error("[generate-image] Lovable gateway error:", response.status, errText.substring(0, 300));
-    if (response.status === 402 || response.status === 429) return null;
     return null;
   }
 
@@ -104,15 +116,22 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SERVER_GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
     let base64Url: string | null = null;
     let usedModel = "gemini-direct";
 
-    // Strategy 1: Try user's Gemini API key directly (no credit limits)
+    // Strategy 1: Try user's Gemini API key
     if (geminiApiKey) {
       base64Url = await generateWithGeminiDirect(geminiApiKey, prompt);
     }
 
-    // Strategy 2: Fallback to Lovable Gateway
+    // Strategy 2: Try server-side Gemini API key
+    if (!base64Url && SERVER_GEMINI_KEY) {
+      console.log("[generate-image] Using server-side GEMINI_API_KEY");
+      base64Url = await generateWithGeminiDirect(SERVER_GEMINI_KEY, prompt);
+    }
+
+    // Strategy 3: Fallback to Lovable Gateway
     if (!base64Url && LOVABLE_API_KEY) {
       usedModel = modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
       base64Url = await generateWithLovableGateway(LOVABLE_API_KEY, prompt, modelKey || "standard");
