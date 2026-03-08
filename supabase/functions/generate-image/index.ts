@@ -9,9 +9,9 @@ const corsHeaders = {
 async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise<string | null> {
   // Try multiple model names for compatibility
   const models = [
-    "gemini-2.5-flash-preview-04-17",
-    "gemini-2.0-flash",
     "gemini-2.5-flash",
+    "gemini-3.1-flash-image-preview",
+    "gemini-3-pro-image-preview",
   ];
 
   for (const model of models) {
