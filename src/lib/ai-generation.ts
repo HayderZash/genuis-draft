@@ -222,6 +222,7 @@ Each description MUST be specific, realistic, and directly related to the preced
 - استخدم <p> للنص العادي.
 ${figureInstruction ? `- ${figureInstruction}` : ''}
 ${tableInstruction ? `- ${tableInstruction}` : ''}
+${projectComponentsInstruction ? `- ${projectComponentsInstruction}` : ''}
 - ${noRefsInChapter}
 - لا تستخدم رموز خاصة أو أكواد Unicode غير عربية.`
       : `You are an academic expert. Write in formal academic English. ${dirInstruction}
@@ -231,6 +232,7 @@ Formatting rules:
 - Use <p> for body text.
 ${figureInstruction ? `- ${figureInstruction}` : ''}
 ${tableInstruction ? `- ${tableInstruction}` : ''}
+${projectComponentsInstruction ? `- ${projectComponentsInstruction}` : ''}
 - ${noRefsInChapter}
 - Do not use special symbols or unusual Unicode characters.`;
 
