@@ -471,12 +471,23 @@ async function generateWithCloudflare(prompt: string, visualMode: VisualMode, co
   return null;
 }
 
-async function generateWithPollinations(prompt: string, context?: string): Promise<string | null> {
+async function generateWithPollinations(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
   console.log("[generate-image] Using Pollinations.ai (free)");
   try {
-    const fullPrompt = context ? `${prompt}, related to ${context}` : prompt;
+    const modeHint: Record<VisualMode, string> = {
+      photo: "ultra realistic professional photography, natural lighting, accurate real-world subject",
+      technical_diagram: "clean technical product visualization, precise engineering render, white background",
+      workflow_diagram: "clean process visualization, minimal layout, white background",
+      map_infographic: "clean geographic infographic, minimal design, white background",
+      chart_infographic: "clean visual comparison infographic, minimal design, white background",
+      ui_mockup: "modern realistic interface mockup, clean layout, polished UI",
+    };
+
+    const fullPrompt = [prompt, context ? `related to ${context}` : "", modeHint[visualMode], "high detail, clean composition, no cartoon, no painting, no text, no labels, no watermark"]
+      .filter(Boolean)
+      .join(", ");
     const shortPrompt = fullPrompt.substring(0, 200);
-    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic real-life photo, realistic lighting, accurate subject, clean composition, professional photography, highly detailed, no illustration, no cartoon, no text`);
+    const encodedPrompt = encodeURIComponent(shortPrompt);
     const seed = Math.floor(Math.random() * 100000);
     const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&enhance=true&model=flux&seed=${seed}`;
 
@@ -568,6 +579,11 @@ serve(async (req) => {
     if (!imageUrl) {
       imageUrl = await generateWithCloudflare(finalPrompt, visualMode, finalContext);
       if (imageUrl) usedModel = "cloudflare-flux";
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithPollinations(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "pollinations-flux";
     }
 
     if (!imageUrl) {
