@@ -163,15 +163,37 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
     const dirInstruction = project.text_direction === 'ltr' ? 'Write in left-to-right direction.' : 'Write in right-to-left direction.';
 
     const includeTables = project.include_data_tables;
+    const isProjectType = project.project_type === 'project';
+
+    // Special instruction for Chapter 3 in project mode: describe components from abstract
+    const projectComponentsInstruction = (isProjectType && chapterNum === 3)
+      ? (researchLang === 'ar'
+        ? `مهم جداً: هذا فصل "المنهجية" في مشروع تخرج. يجب أن تتضمن فقرة خاصة بعنوان "مكونات المشروع" تشرح فيها كل مكون من المكونات المذكورة في النبذة/الملخص التالي:
+"${project.abstract}"
+لكل مكون:
+1. اكتب عنوان فرعي <h3> باسم المكون.
+2. اشرح المكون بالتفصيل في 2-3 فقرات (وظيفته، أهميته، كيف يعمل).
+3. أضف عنوان صورة توضيحية أسفل الشرح بالتنسيق:
+<p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.X: وصف دقيق بالإنجليزية للمكون يوضح شكله أو واجهته أو مخطط عمله]</p>
+تأكد أن الوصف دقيق ومرتبط بالمكون المشروح.`
+        : `CRITICAL: This is the "Methodology" chapter of a graduation project. You MUST include a section titled "Project Components" that explains each component mentioned in the abstract:
+"${project.abstract}"
+For each component:
+1. Write a <h3> subheading with the component name.
+2. Explain the component in detail in 2-3 paragraphs (function, importance, how it works).
+3. Add a figure caption below the explanation in this format:
+<p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.X: A precise English description of the component showing its interface, diagram, or architecture]</p>
+Ensure descriptions are specific and related to the explained component.`)
+      : '';
 
     const figureInstruction = includeImages
       ? (researchLang === 'ar'
         ? `مهم جداً: يجب أن تضيف ما لا يقل عن 3 إلى 5 عناوين صور توضيحية في هذا الفصل، موزعة بين الفقرات (ليس في النهاية فقط). كل عنوان صورة يجب أن يكون بالتنسيق التالي بالضبط:
-<p class="figure-caption">[Figure ${chapterNum}.1: وصف دقيق ومفصل بالإنجليزية لما يجب أن تُظهره الصورة، مثل: A detailed cross-section diagram of a lithium-ion battery showing anode, cathode, and electrolyte layers]</p>
-يجب أن يكون الوصف دقيقاً وواقعياً ومرتبطاً مباشرة بالمحتوى المكتوب في الفقرة السابقة. لا تستخدم أوصافاً عامة أو مبهمة. اذكر بالضبط ما يجب أن يظهر في الصورة.`
+<p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.1: وصف دقيق ومفصل بالإنجليزية لما يجب أن تُظهره الصورة]</p>
+يجب أن يكون الوصف دقيقاً وواقعياً ومرتبطاً مباشرة بالمحتوى المكتوب في الفقرة السابقة.`
         : `CRITICAL: You MUST include at least 3 to 5 figure captions in this chapter, distributed between paragraphs (NOT only at the end). Each figure caption MUST follow this exact format:
-<p class="figure-caption">[Figure ${chapterNum}.1: A specific, detailed description of exactly what the image should show, e.g. "A bar chart comparing renewable energy adoption rates across European countries from 2020 to 2025"]</p>
-Each description MUST be specific, realistic, and directly related to the preceding paragraph content. Do NOT use vague descriptions like "illustration of the concept" - instead describe exactly what visual elements should appear.`)
+<p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.1: A specific, detailed description of exactly what the image should show]</p>
+Each description MUST be specific, realistic, and directly related to the preceding paragraph content.`)
       : '';
 
     const tableInstruction = includeTables
