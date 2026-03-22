@@ -24,6 +24,34 @@ function containsArabic(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
+const DEFAULT_NEGATIVE_PROMPT = [
+  "cartoon",
+  "illustration",
+  "drawing",
+  "painting",
+  "anime",
+  "comic",
+  "3d render",
+  "cgi",
+  "stylized",
+  "abstract",
+  "fantasy",
+  "surreal",
+  "deformed",
+  "distorted",
+  "extra limbs",
+  "bad anatomy",
+  "unrealistic face",
+  "blurry",
+  "low detail",
+  "low quality",
+  "text",
+  "watermark",
+  "logo",
+  "caption",
+  "unrelated objects",
+].join(", ");
+
 // Translate Arabic prompt to English using Lovable AI Gateway
 async function translateToEnglish(text: string): Promise<string> {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -40,7 +68,11 @@ async function translateToEnglish(text: string): Promise<string> {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite",
         messages: [
-          { role: "system", content: "Translate the following text to English. Return ONLY the English translation, nothing else. Keep it concise and descriptive." },
+          {
+            role: "system",
+            content:
+              "Translate the following user request into precise English for text-to-image generation. Preserve the exact subject, action, setting, and important details. Do not add new objects or artistic style words unless they are explicitly mentioned. Return ONLY the English translation.",
+          },
           { role: "user", content: text },
         ],
       }),
@@ -59,9 +91,29 @@ async function translateToEnglish(text: string): Promise<string> {
   return text;
 }
 
+function normalizePrompt(prompt: string): string {
+  return prompt.replace(/\s+/g, " ").trim();
+}
+
 function getPrompt(prompt: string, context?: string) {
-  const contextPart = context ? ` for a research paper about "${context}"` : '';
-  return `Create a realistic, high-quality illustration${contextPart}. The image must clearly and accurately depict: ${prompt}. Requirements: photorealistic style, professional quality, relevant and accurate to the described subject, clean composition, no watermarks, minimal or no text in the image.`;
+  const cleanPrompt = normalizePrompt(prompt);
+  const cleanContext = context ? normalizePrompt(context) : "";
+  const contextPart = cleanContext
+    ? ` Context/topic: "${cleanContext}". Use it only to improve relevance and do not let it override the main subject.`
+    : "";
+
+  return [
+    "Create one highly realistic, well-composed, visually clean, photorealistic image.",
+    `Main subject to depict exactly: "${cleanPrompt}".`,
+    contextPart,
+    "Follow the user description literally and accurately.",
+    "Use natural lighting, realistic materials, believable proportions, and a professional documentary or studio-photo look depending on the subject.",
+    "Keep the scene organized and focused on the requested subject only.",
+    "Do not add unrelated objects, symbolic elements, fantasy details, or decorative text.",
+    "The result must look like a real photo, not an illustration.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function getSupabaseAdmin() {
@@ -171,8 +223,8 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
   if (!accountId || !apiToken) return null;
 
   const models = [
-    "@cf/bytedance/stable-diffusion-xl-lightning",
     "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+    "@cf/bytedance/stable-diffusion-xl-lightning",
   ];
 
   for (const model of models) {
@@ -187,7 +239,11 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
         },
         body: JSON.stringify({
           prompt: getPrompt(prompt, context),
-          num_steps: 20,
+          negative_prompt: DEFAULT_NEGATIVE_PROMPT,
+          num_steps: model.includes("lightning") ? 8 : 28,
+          guidance: model.includes("lightning") ? 7.5 : 11,
+          width: 1024,
+          height: 768,
         }),
       });
 
@@ -230,7 +286,7 @@ async function generateWithPollinations(prompt: string, context?: string): Promi
   try {
     const fullPrompt = context ? `${prompt}, related to ${context}` : prompt;
     const shortPrompt = fullPrompt.substring(0, 200);
-    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic, professional, academic research illustration, detailed, high quality`);
+    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic real-life photo, realistic lighting, accurate subject, clean composition, professional photography, highly detailed, no illustration, no cartoon, no text`);
     const seed = Math.floor(Math.random() * 100000);
     const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&seed=${seed}`;
 
