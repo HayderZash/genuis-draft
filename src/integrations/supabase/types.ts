@@ -265,6 +265,7 @@ export type Database = {
           margin_left: number
           margin_right: number
           margin_top: number
+          project_type: string
           reference_count: number
           research_language: string
           source_files: Json | null
@@ -293,6 +294,7 @@ export type Database = {
           margin_left?: number
           margin_right?: number
           margin_top?: number
+          project_type?: string
           reference_count?: number
           research_language?: string
           source_files?: Json | null
@@ -321,6 +323,7 @@ export type Database = {
           margin_left?: number
           margin_right?: number
           margin_top?: number
+          project_type?: string
           reference_count?: number
           research_language?: string
           source_files?: Json | null

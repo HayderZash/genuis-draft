@@ -1,0 +1,1 @@
+ALTER TABLE public.research_projects ADD COLUMN project_type text NOT NULL DEFAULT 'research';
