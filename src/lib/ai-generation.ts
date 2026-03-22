@@ -13,7 +13,7 @@ interface GenerateParams {
   t: (key: TranslationKey) => string;
 }
 
-const WORDS_PER_PAGE = 250;
+const WORDS_PER_PAGE = 200;
 
 /** Delay helper */
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
