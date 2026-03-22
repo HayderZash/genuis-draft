@@ -242,7 +242,7 @@ Instructions:
 6. End the chapter with a summary paragraph.
 ${isLast ? 'This is the final chapter - write a comprehensive conclusion.' : ''}${refsInstruction}
 
-Important: Write each paragraph fully and in detail. Do not abbreviate.`;
+Important: Write in-depth but concisely. Do NOT repeat the same ideas in different wordings.`;
 
     try {
       const raw = await callAI(systemPrompt, userPrompt, 8000, 0.7);
