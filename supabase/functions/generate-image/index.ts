@@ -516,6 +516,87 @@ async function generateWithPollinations(prompt: string, visualMode: VisualMode, 
   }
 }
 
+function buildWikimediaSearchQuery(prompt: string, context?: string, visualMode?: VisualMode) {
+  const stopWords = new Set([
+    "the", "and", "for", "with", "from", "that", "this", "into", "using", "showing", "image", "figure", "exactly", "should", "what", "clean", "modern", "related", "topic", "context",
+    "على", "من", "في", "عن", "إلى", "هذا", "هذه", "التي", "الذي", "صورة", "شكل", "يوضح", "توضح", "بحث", "مشروع", "موضوع",
+  ]);
+
+  const base = `${context || ""} ${prompt}`
+    .replace(/figure\s+\d+(?:\.\d+)?/gi, " ")
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const keywords = base
+    .split(" ")
+    .map((word) => word.trim())
+    .filter((word) => word.length > 2 && !stopWords.has(word.toLowerCase()));
+
+  const suffix = visualMode === "technical_diagram"
+    ? ["device", "equipment"]
+    : visualMode === "photo"
+      ? ["equipment", "photo"]
+      : [];
+
+  return [...keywords.slice(0, 8), ...suffix].join(" ").trim() || prompt;
+}
+
+async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  console.log("[generate-image] Using Wikimedia Commons fallback");
+
+  const query = buildWikimediaSearchQuery(prompt, context, visualMode);
+  const searchUrl = new URL("https://commons.wikimedia.org/w/api.php");
+  searchUrl.searchParams.set("action", "query");
+  searchUrl.searchParams.set("format", "json");
+  searchUrl.searchParams.set("generator", "search");
+  searchUrl.searchParams.set("gsrsearch", query);
+  searchUrl.searchParams.set("gsrnamespace", "6");
+  searchUrl.searchParams.set("gsrlimit", "5");
+  searchUrl.searchParams.set("prop", "imageinfo");
+  searchUrl.searchParams.set("iiprop", "url");
+
+  try {
+    const response = await fetch(searchUrl.toString(), {
+      headers: { "User-Agent": "LovableResearchImageBot/1.0 (https://lovable.dev)" },
+    });
+
+    if (!response.ok) {
+      console.error("[generate-image] Wikimedia search failed:", response.status, await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    const pages = Object.values(data?.query?.pages || {}) as Array<{ imageinfo?: Array<{ url?: string }> }>;
+    const urls = pages
+      .flatMap((page) => page.imageinfo?.map((info) => info.url || "") || [])
+      .filter((url) => /\.(png|jpe?g|webp)$/i.test(url));
+
+    for (const remoteUrl of urls) {
+      const imageResponse = await fetch(remoteUrl, {
+        headers: { "User-Agent": "LovableResearchImageBot/1.0 (https://lovable.dev)" },
+      });
+
+      if (!imageResponse.ok) continue;
+
+      const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+      if (!contentType.startsWith("image/")) continue;
+
+      const bytes = new Uint8Array(await imageResponse.arrayBuffer());
+      if (!bytes.byteLength) continue;
+
+      const uploadedUrl = await uploadBytesToStorage(bytes, contentType);
+      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
+        return uploadedUrl;
+      }
+    }
+  } catch (e) {
+    console.error("[generate-image] Wikimedia fallback error:", e);
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -579,6 +660,11 @@ serve(async (req) => {
     if (!imageUrl) {
       imageUrl = await generateWithCloudflare(finalPrompt, visualMode, finalContext);
       if (imageUrl) usedModel = "cloudflare-flux";
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithWikimediaCommons(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "wikimedia-commons";
     }
 
     if (!imageUrl) {
