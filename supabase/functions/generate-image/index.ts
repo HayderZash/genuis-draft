@@ -238,14 +238,14 @@ serve(async (req) => {
     let usedModel = "unknown";
 
     if (geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt, preset);
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt, preset, imageContext);
       if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-user-pro" : "gemini-direct-user-flash";
     }
 
     if (!imageUrl) {
       const serverKey = Deno.env.get("GEMINI_API_KEY");
       if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, prompt, preset);
+        imageUrl = await generateWithGeminiDirect(serverKey, prompt, preset, imageContext);
         if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-server-pro" : "gemini-direct-server-flash";
       }
     }
@@ -253,18 +253,18 @@ serve(async (req) => {
     if (!imageUrl) {
       const lovableKey = Deno.env.get("LOVABLE_API_KEY");
       if (lovableKey) {
-        imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset);
+        imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset, imageContext);
         if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
       }
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(prompt);
+      imageUrl = await generateWithCloudflare(prompt, imageContext);
       if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(prompt);
+      imageUrl = await generateWithPollinations(prompt, imageContext);
       if (imageUrl) usedModel = "pollinations-free";
     }
 
