@@ -226,9 +226,10 @@ const ProjectEditor = () => {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!project) return;
-    exportToDocx(project, lang);
+    toast({ title: lang === 'ar' ? 'جاري تحضير الملف...' : 'Preparing file...' });
+    await exportToDocx(project, lang);
   };
 
   if (loading || !project) return <div className="flex items-center justify-center min-h-screen">...</div>;
