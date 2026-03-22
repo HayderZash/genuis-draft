@@ -186,6 +186,9 @@ export const translations = {
   myResearch: { ar: 'بحوثي الأكاديمية', en: 'My Academic Research' },
   newResearch: { ar: 'بحث جديد', en: 'New Research' },
   noResearch: { ar: 'لا توجد بحوث بعد. ابدأ بإنشاء بحث جديد!', en: 'No research yet. Start by creating a new one!' },
+  projectType: { ar: 'نوع العمل', en: 'Work Type' },
+  projectTypeResearch: { ar: 'بحث أكاديمي', en: 'Academic Research' },
+  projectTypeProject: { ar: 'مشروع تخرج', en: 'Graduation Project' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

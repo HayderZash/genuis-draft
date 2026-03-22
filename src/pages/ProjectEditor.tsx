@@ -80,6 +80,7 @@ const ProjectEditor = () => {
       include_images: data.include_images ?? false,
       include_data_tables: data.include_data_tables ?? false,
       image_quality: (data as any).image_quality || 'standard',
+      project_type: (data as any).project_type || 'research',
     });
     setLoading(false);
   }, [id, navigate]);
