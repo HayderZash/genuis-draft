@@ -47,9 +47,7 @@ async function uploadBytesToStorage(imageBytes: Uint8Array, contentType = "image
 
 async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) {
-    throw new Error("Invalid image data URL");
-  }
+  if (!match) throw new Error("Invalid image data URL");
 
   const [, mimeType, base64Data] = match;
   const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
@@ -57,9 +55,7 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
 }
 
 async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset): Promise<string | null> {
-  const models = MODEL_MAP[preset].gateway;
-
-  for (const model of models) {
+  for (const model of MODEL_MAP[preset].gateway) {
     console.log(`[generate-image] Trying Lovable gateway: ${model}`);
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -92,13 +88,10 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
 }
 
 async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset): Promise<string | null> {
-  const models = MODEL_MAP[preset].gemini;
-
-  for (const model of models) {
+  for (const model of MODEL_MAP[preset].gemini) {
     console.log(`[generate-image] Trying Gemini direct: ${model}`);
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-      const res = await fetch(url, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -130,6 +123,67 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
   return null;
 }
 
+async function generateWithCloudflare(prompt: string): Promise<string | null> {
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+
+  if (!accountId || !apiToken) return null;
+
+  const models = [
+    "@cf/bytedance/stable-diffusion-xl-lightning",
+    "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+  ];
+
+  for (const model of models) {
+    console.log(`[generate-image] Trying Cloudflare: ${model}`);
+    try {
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          "Content-Type": "application/json",
+          Accept: "image/png,application/json",
+        },
+        body: JSON.stringify({
+          prompt: getPrompt(prompt),
+          num_steps: 20,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`[generate-image] Cloudflare ${model}: ${res.status} ${errorText}`);
+        continue;
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        const base64 = data?.result?.image || data?.result?.base64 || data?.image;
+        if (typeof base64 === "string" && base64.length > 100) {
+          return await uploadDataUrlToStorage(`data:image/png;base64,${base64}`);
+        }
+
+        console.error(`[generate-image] Cloudflare ${model}: no image payload in JSON response`);
+        continue;
+      }
+
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (!bytes.byteLength) {
+        console.error(`[generate-image] Cloudflare ${model}: empty binary response`);
+        continue;
+      }
+
+      return await uploadBytesToStorage(bytes, contentType || "image/png");
+    } catch (e) {
+      console.error(`[generate-image] Cloudflare ${model} error:`, e);
+    }
+  }
+
+  return null;
+}
+
 async function generateWithPollinations(prompt: string): Promise<string | null> {
   console.log("[generate-image] Using Pollinations.ai (free)");
   try {
@@ -139,9 +193,7 @@ async function generateWithPollinations(prompt: string): Promise<string | null> 
     const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&seed=${seed}`;
 
     const imageResponse = await fetch(remoteUrl, {
-      headers: {
-        Accept: "image/png,image/jpeg,image/webp,*/*",
-      },
+      headers: { Accept: "image/png,image/jpeg,image/webp,*/*" },
     });
 
     if (!imageResponse.ok) {
@@ -151,7 +203,6 @@ async function generateWithPollinations(prompt: string): Promise<string | null> 
 
     const contentType = imageResponse.headers.get("content-type") || "image/png";
     const arrayBuffer = await imageResponse.arrayBuffer();
-
     if (!arrayBuffer.byteLength) {
       console.error("[generate-image] Pollinations returned empty body");
       return null;
@@ -202,6 +253,11 @@ serve(async (req) => {
         imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset);
         if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
       }
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithCloudflare(prompt);
+      if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
