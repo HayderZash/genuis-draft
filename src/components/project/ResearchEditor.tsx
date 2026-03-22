@@ -44,6 +44,7 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
     extensions: [
       StarterKit,
       Underline,
+      Image.configure({ inline: false, allowBase64: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
     ],
     content: buildHtml(),
