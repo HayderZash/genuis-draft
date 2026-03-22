@@ -254,26 +254,6 @@ async function callReferenceFallback(messages: ChatMessage[], language?: string)
     status: 200,
   };
 }
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content?.trim();
-  if (!latestUserMessage) {
-    return {
-      reply: language === "ar" ? "تعذر تنفيذ الطلب حالياً. حاول مرة أخرى بعد قليل." : "The request could not be completed right now. Please try again shortly.",
-      error: null,
-      status: 200,
-    };
-  }
-
-  const summary = await fetchWikipediaSummary(latestUserMessage, language);
-  if (summary) return { reply: summary, error: null, status: 200 };
-
-  return {
-    reply: language === "ar"
-      ? "تعذر الوصول حالياً إلى مزودات الذكاء الاصطناعي، ولم أتمكن أيضاً من جلب مرجع مناسب لسؤالك. حاول لاحقاً أو أضف مزود AI من الإعدادات."
-      : "AI providers are currently unavailable, and I could not fetch a suitable reference for your question. Please try again later or add an AI provider in settings.",
-    error: null,
-    status: 200,
-  };
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
