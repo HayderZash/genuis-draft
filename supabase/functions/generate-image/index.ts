@@ -274,18 +274,35 @@ serve(async (req) => {
       });
     }
 
+    // Translate Arabic prompts to English for better image generation
+    let finalPrompt = prompt;
+    let finalContext = imageContext;
+    if (containsArabic(prompt)) {
+      finalPrompt = await translateToEnglish(prompt);
+    }
+    if (finalContext && containsArabic(finalContext)) {
+      finalContext = await translateToEnglish(finalContext);
+    }
+
+    if (!finalPrompt || finalPrompt === prompt) {
+      // Translation failed or returned same text, keep original
+      finalPrompt = prompt;
+    }
+
+    console.log(`[generate-image] Final prompt: "${finalPrompt}"`);
+
     let imageUrl: string | null = null;
     let usedModel = "unknown";
 
     if (geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt, preset, imageContext);
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, preset, finalContext);
       if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-user-pro" : "gemini-direct-user-flash";
     }
 
     if (!imageUrl) {
       const serverKey = Deno.env.get("GEMINI_API_KEY");
       if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, prompt, preset, imageContext);
+        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, preset, finalContext);
         if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-server-pro" : "gemini-direct-server-flash";
       }
     }
@@ -293,18 +310,18 @@ serve(async (req) => {
     if (!imageUrl) {
       const lovableKey = Deno.env.get("LOVABLE_API_KEY");
       if (lovableKey) {
-        imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset, imageContext);
+        imageUrl = await generateWithLovableGateway(lovableKey, finalPrompt, preset, finalContext);
         if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
       }
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(prompt, imageContext);
+      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
       if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(prompt, imageContext);
+      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
       if (imageUrl) usedModel = "pollinations-free";
     }
 
