@@ -81,11 +81,20 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
         .research-editor h2 { font-size: 18px; font-weight: bold; margin: 1.2em 0 0.4em; }
         .research-editor h3 { font-size: 16px; font-weight: bold; text-decoration: underline; margin: 1em 0 0.3em; }
         .research-editor p { font-size: 14px; line-height: 1.8; margin: 0.5em 0; text-align: justify; }
-        .research-editor .figure-caption { font-size: 12px; font-style: italic; text-align: center; margin: 0.5em 0; }
-        .research-editor img { max-width: 100%; border-radius: 8px; margin: 12px auto; display: block; }
+        .research-editor p.figure-caption,
+        .research-editor p[style*="font-style:italic"][style*="text-align:center"] { 
+          font-size: 12px !important; 
+          font-style: italic !important; 
+          text-align: center !important; 
+          margin: 0.5em 0 1em; 
+          color: #333;
+        }
+        .research-editor img { max-width: 80%; border-radius: 8px; margin: 12px auto; display: block; }
+        .research-editor .generated-figure { text-align: center; margin: 16px 0; }
         .research-editor { font-family: "Times New Roman", Times, serif; }
         .ProseMirror { min-height: 60vh; }
         .ProseMirror:focus { outline: none; }
+        .ProseMirror img { max-width: 80%; border-radius: 8px; margin: 12px auto; display: block; }
       `}</style>
       <EditorToolbar editor={editor} />
       <EditorContent editor={editor} />
