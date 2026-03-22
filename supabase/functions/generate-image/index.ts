@@ -7,12 +7,7 @@ const corsHeaders = {
 };
 
 async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise<string | null> {
-  // Try multiple model names for compatibility
-  const models = [
-    "gemini-2.5-flash",
-    "gemini-3.1-flash-image-preview",
-    "gemini-3-pro-image-preview",
-  ];
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash-exp"];
 
   for (const model of models) {
     console.log(`[generate-image] Trying Gemini model: ${model}`);
@@ -53,30 +48,45 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise
 }
 
 async function generateWithLovableGateway(apiKey: string, prompt: string, modelKey: string): Promise<string | null> {
-  const selectedModel = modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
-  console.log(`[generate-image] Using Lovable gateway, model: ${selectedModel}`);
+  // Use image generation models
+  const models = [
+    modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-3.1-flash-image-preview",
+    "google/gemini-2.5-flash-image",
+  ];
+  
+  for (const selectedModel of models) {
+    console.log(`[generate-image] Trying Lovable gateway model: ${selectedModel}`);
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [{ role: "user", content: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.` }],
+          modalities: ["image", "text"],
+        }),
+      });
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: selectedModel,
-      messages: [{ role: "user", content: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.` }],
-      modalities: ["image", "text"],
-    }),
-  });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error(`[generate-image] Lovable gateway ${selectedModel} error: ${response.status} ${errText.substring(0, 300)}`);
+        continue;
+      }
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    console.error("[generate-image] Lovable gateway error:", response.status, errText.substring(0, 300));
-    return null;
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (imageUrl) {
+        console.log(`[generate-image] Lovable gateway success with ${selectedModel}`);
+        return imageUrl;
+      }
+    } catch (e) {
+      console.error(`[generate-image] Lovable gateway ${selectedModel} exception:`, e);
+    }
   }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
+  return null;
 }
 
 async function uploadToStorage(base64Url: string): Promise<string> {
@@ -96,7 +106,7 @@ async function uploadToStorage(base64Url: string): Promise<string> {
 
   if (error) {
     console.error("Storage upload failed:", error.message);
-    return base64Url; // fallback
+    return base64Url; // fallback to inline
   }
 
   const { data: publicUrlData } = supabase.storage.from("research-images").getPublicUrl(filePath);
@@ -118,27 +128,31 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SERVER_GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
     let base64Url: string | null = null;
-    let usedModel = "gemini-direct";
+    let usedModel = "unknown";
 
-    // Strategy 1: Try user's Gemini API key
+    // Strategy 1: User's Gemini API key (direct)
     if (geminiApiKey) {
+      console.log("[generate-image] Strategy 1: User Gemini key");
       base64Url = await generateWithGeminiDirect(geminiApiKey, prompt);
+      if (base64Url) usedModel = "gemini-direct-user";
     }
 
-    // Strategy 2: Try server-side Gemini API key
+    // Strategy 2: Server Gemini API key (direct)
     if (!base64Url && SERVER_GEMINI_KEY) {
-      console.log("[generate-image] Using server-side GEMINI_API_KEY");
+      console.log("[generate-image] Strategy 2: Server Gemini key");
       base64Url = await generateWithGeminiDirect(SERVER_GEMINI_KEY, prompt);
+      if (base64Url) usedModel = "gemini-direct-server";
     }
 
-    // Strategy 3: Fallback to Lovable Gateway
+    // Strategy 3: Lovable Gateway (image models)
     if (!base64Url && LOVABLE_API_KEY) {
-      usedModel = modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
+      console.log("[generate-image] Strategy 3: Lovable Gateway");
       base64Url = await generateWithLovableGateway(LOVABLE_API_KEY, prompt, modelKey || "standard");
+      if (base64Url) usedModel = "lovable-gateway";
     }
 
     if (!base64Url) {
-      return new Response(JSON.stringify({ error: "Image generation failed - no available provider" }), {
+      return new Response(JSON.stringify({ error: "Image generation failed - no available provider. Please check your Gemini API key quota." }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

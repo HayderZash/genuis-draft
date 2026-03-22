@@ -13,7 +13,7 @@ interface GenerateParams {
   t: (key: TranslationKey) => string;
 }
 
-const WORDS_PER_PAGE = 250;
+const WORDS_PER_PAGE = 200;
 
 /** Delay helper */
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -156,7 +156,7 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
     onProgress(progressStep, baseProgress);
 
     const chapterPages = project.chapter_pages?.[i];
-    const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 1200;
+    const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 800;
     const chapterNum = i + 1;
     const isLast = i === totalChapters - 1;
     const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
@@ -191,8 +191,8 @@ Each caption must describe a visual element related to the content such as: diag
       : `Number headings: chapter title "Chapter ${chapterNum}: ${chapterName}" in <h1>, main headings ${chapterNum}.1, ${chapterNum}.2 in <h2>, subheadings ${chapterNum}.1.1 in <h3>.`;
 
     const pageCountStrict = researchLang === 'ar'
-      ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب محتوى كافياً لملء هذا العدد. لا تكتب أقل.`
-      : `CRITICAL: This chapter MUST be exactly ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write enough content to fill this count. Do NOT write less.`;
+      ? `هام: يجب أن يكون طول هذا الفصل حوالي ${wordTarget} كلمة (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب بإيجاز وعمق دون تكرار. لا تعد صياغة نفس الأفكار.`
+      : `This chapter should be approximately ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write concisely and in-depth without repetition. Do NOT rephrase the same ideas.`;
 
     const systemPrompt = researchLang === 'ar'
       ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction}
@@ -225,10 +225,10 @@ ${pageCountStrict}
 3. قسّم المحتوى إلى أقسام فرعية واضحة بعناوين <h2>.
 4. لكل قسم فرعي، اكتب 3-5 فقرات مفصلة ومعمقة.
 5. إذا احتاج القسم لتفصيل أكبر، أضف عناوين <h3>.
-6. اختم الفصل بفقرة ملخصة.
+    6. اختم الفصل بفقرة ملخصة.
 ${isLast ? 'هذا هو الفصل الأخير - اكتب خاتمة شاملة.' : ''}${refsInstruction}
 
-مهم: اكتب كل فقرة بشكل كامل ومفصل. لا تختصر.`
+مهم: اكتب بعمق وإيجاز. لا تكرر نفس الأفكار أو الجمل بصياغات مختلفة.`
       : `Write chapter "${chapterName}" for a research paper titled "${project.title}".
 Abstract: ${project.abstract || 'Not specified'}.
 ${pageCountStrict}
@@ -242,7 +242,7 @@ Instructions:
 6. End the chapter with a summary paragraph.
 ${isLast ? 'This is the final chapter - write a comprehensive conclusion.' : ''}${refsInstruction}
 
-Important: Write each paragraph fully and in detail. Do not abbreviate.`;
+Important: Write in-depth but concisely. Do NOT repeat the same ideas in different wordings.`;
 
     try {
       const raw = await callAI(systemPrompt, userPrompt, 8000, 0.7);
@@ -292,7 +292,7 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 20);
 
   const chapterPages = project.chapter_pages?.[chapterIndex];
-  const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 1200;
+  const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 800;
   const chapterNum = chapterIndex + 1;
   const isLast = chapterIndex === project.chapters.length - 1;
   const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
@@ -326,8 +326,8 @@ Place them BETWEEN paragraphs, not at the end.`)
     : `Number: "Chapter ${chapterNum}: ${chapterName}" in <h1>, main ${chapterNum}.1 in <h2>, sub ${chapterNum}.1.1 in <h3>.`;
 
   const pageCountStrict = researchLang === 'ar'
-    ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). لا تكتب أقل.`
-    : `CRITICAL: This chapter MUST be exactly ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Do NOT write less.`;
+    ? `هام: يجب أن يكون طول هذا الفصل حوالي ${wordTarget} كلمة (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب بإيجاز وعمق دون تكرار.`
+    : `This chapter should be approximately ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write concisely without repetition.`;
 
   const systemPrompt = researchLang === 'ar'
     ? `أنت خبير أكاديمي. اكتب بأسلوب رسمي بالعربية. ${dirInstruction}
