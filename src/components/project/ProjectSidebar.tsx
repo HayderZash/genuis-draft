@@ -40,6 +40,17 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
       <h3 className="font-semibold text-lg">{t('projectInputs')}</h3>
 
       <div className="space-y-2">
+        <Label>{t('projectType')}</Label>
+        <Select value={project.project_type || 'research'} onValueChange={(v) => onUpdate({ project_type: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="research">{t('projectTypeResearch')}</SelectItem>
+            <SelectItem value="project">{t('projectTypeProject')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
         <Label>{t('researchTitle')}</Label>
         <Input value={project.title} onChange={(e) => onUpdate({ title: e.target.value })} />
       </div>
