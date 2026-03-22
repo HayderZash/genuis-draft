@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Bot, Send, X, Copy, User, Loader2, Minimize2, Maximize2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getAssistantProviderPayload } from '@/lib/assistant-provider';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -33,8 +34,9 @@ export const FloatingAIAssistant = () => {
     setLoading(true);
 
     try {
+      const providerPayload = getAssistantProviderPayload();
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: { messages: newMessages, language: lang },
+        body: { messages: newMessages, language: lang, ...providerPayload },
       });
       if (error) throw error;
       setMessages([...newMessages, { role: 'assistant', content: data?.reply || '' }]);
