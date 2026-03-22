@@ -222,8 +222,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, geminiApiKey, model } = await req.json();
+    const { prompt, geminiApiKey, model, context } = await req.json();
     const preset: ModelPreset = model === "pro" ? "pro" : "standard";
+    const imageContext = context || "";
 
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Missing prompt" }), {
