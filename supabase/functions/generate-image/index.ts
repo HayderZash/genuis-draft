@@ -8,8 +8,8 @@ const corsHeaders = {
 
 const MODEL_MAP = {
   standard: {
-    gemini: ["gemini-2.5-flash-image", "gemini-3.1-flash-image-preview"],
-    gateway: ["google/gemini-2.5-flash-image", "google/gemini-3.1-flash-image-preview"],
+    gemini: ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
+    gateway: ["google/gemini-3.1-flash-image-preview", "google/gemini-2.5-flash-image"],
   },
   pro: {
     gemini: ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
@@ -18,6 +18,7 @@ const MODEL_MAP = {
 } as const;
 
 type ModelPreset = keyof typeof MODEL_MAP;
+type VisualMode = "photo" | "technical_diagram" | "workflow_diagram" | "map_infographic" | "chart_infographic" | "ui_mockup";
 
 // Detect if text contains Arabic/non-Latin characters
 function containsArabic(text: string): boolean {
@@ -104,34 +105,6 @@ async function runTextTask(system: string, user: string): Promise<string | null>
   return await runGeminiTextTask(system, user) || await runLovableTextTask(system, user);
 }
 
-const DEFAULT_NEGATIVE_PROMPT = [
-  "cartoon",
-  "illustration",
-  "drawing",
-  "painting",
-  "anime",
-  "comic",
-  "3d render",
-  "cgi",
-  "stylized",
-  "abstract",
-  "fantasy",
-  "surreal",
-  "deformed",
-  "distorted",
-  "extra limbs",
-  "bad anatomy",
-  "unrealistic face",
-  "blurry",
-  "low detail",
-  "low quality",
-  "text",
-  "watermark",
-  "logo",
-  "caption",
-  "unrelated objects",
-].join(", ");
-
 // Translate Arabic prompt to English using Lovable AI Gateway
 async function translateToEnglish(text: string): Promise<string> {
   try {
@@ -159,9 +132,20 @@ async function enhancePromptForRealism(prompt: string, context?: string): Promis
   const normalizedPrompt = normalizePrompt(prompt);
   const normalizedContext = context ? normalizePrompt(context) : "";
 
+  const visualMode = detectVisualMode(normalizedPrompt, normalizedContext);
+
+  const rewriteSystemByMode: Record<VisualMode, string> = {
+    photo: "You rewrite prompts for photorealistic image generation. Preserve the exact subject and meaning. Make the wording more precise, realistic, visually grounded, and accurate. Do not add unrelated objects, architecture, symbolism, fantasy details, or art styles. Return only one concise English prompt.",
+    technical_diagram: "You rewrite prompts for clean, modern technical diagrams and engineering visuals. Preserve the exact subject and meaning. Make the wording precise, structured, and visually accurate. Prefer a neat academic or product-design presentation. Do not add unrelated objects, scenery, fantasy details, or decorative elements. Return only one concise English prompt.",
+    workflow_diagram: "You rewrite prompts for clean workflow and process diagrams. Preserve the exact process and subject. Make the wording structured, minimal, and visually clear. Avoid decorative scenery, fantasy elements, and unrelated objects. Return only one concise English prompt.",
+    map_infographic: "You rewrite prompts for clean academic map infographics. Preserve the exact geography and subject matter. Make the wording visually specific and organized. Avoid decorative scenery, fantasy elements, and unrelated icons. Do not ask for readable text inside the image. Return only one concise English prompt.",
+    chart_infographic: "You rewrite prompts for clean academic comparison charts and infographics. Preserve the exact compared entities and subject. Make the wording visually specific and organized. Avoid decorative objects, fantasy details, and unrelated scenery. Do not ask for readable text inside the image. Return only one concise English prompt.",
+    ui_mockup: "You rewrite prompts for clean, modern interface mockups. Preserve the exact interface purpose and subject. Make the wording precise and visually organized. Avoid decorative scenery, fantasy details, and unrelated objects. Return only one concise English prompt.",
+  };
+
   try {
     const enhanced = await runTextTask(
-      "You rewrite prompts for photorealistic image generation. Preserve the exact subject and meaning. Make the wording more precise, realistic, visually grounded, and accurate. Do not add unrelated objects, architecture, symbolism, fantasy details, or art styles. Return only one concise English prompt.",
+      rewriteSystemByMode[visualMode],
       `Main request: ${normalizedPrompt}${normalizedContext ? `\nContext: ${normalizedContext}` : ""}`,
     );
 
@@ -176,25 +160,147 @@ async function enhancePromptForRealism(prompt: string, context?: string): Promis
   return normalizedPrompt;
 }
 
-function getPrompt(prompt: string, context?: string) {
+function detectVisualMode(prompt: string, context?: string): VisualMode {
+  const text = `${prompt} ${context || ""}`.toLowerCase();
+
+  if (/(bar chart|line chart|pie chart|area chart|histogram|graph|trend|comparison chart|cost comparison|distribution chart)/.test(text)) {
+    return "chart_infographic";
+  }
+
+  if (/(world map|regional map|heat map|geographic|distribution of .* regions|map illustrating|global distribution|countries|regions)/.test(text)) {
+    return "map_infographic";
+  }
+
+  if (/(workflow|flowchart|process flow|sequence diagram|pipeline|step-by-step process|operational flow)/.test(text)) {
+    return "workflow_diagram";
+  }
+
+  if (/(interface|dashboard|mobile app|web app|website|screen|control panel|monitoring panel|ui|ux)/.test(text)) {
+    return "ui_mockup";
+  }
+
+  if (/(diagram|architecture|block diagram|schematic|circuit|topology|framework|system layout|system architecture)/.test(text)) {
+    return "technical_diagram";
+  }
+
+  return "photo";
+}
+
+function getPrompt(prompt: string, context?: string, visualMode: VisualMode = "photo") {
   const cleanPrompt = normalizePrompt(prompt);
   const cleanContext = context ? normalizePrompt(context) : "";
   const contextPart = cleanContext
     ? ` Context/topic: "${cleanContext}". Use it only to improve relevance and do not let it override the main subject.`
     : "";
 
-  return [
-    "Create one highly realistic, well-composed, visually clean, photorealistic image.",
-    `Main subject to depict exactly: "${cleanPrompt}".`,
-    contextPart,
-    "Follow the user description literally and accurately.",
-    "Use natural lighting, realistic materials, believable proportions, and a professional documentary or studio-photo look depending on the subject.",
-    "Keep the scene organized and focused on the requested subject only.",
-    "Do not add unrelated objects, symbolic elements, fantasy details, or decorative text.",
-    "The result must look like a real photo, not an illustration.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const promptByMode: Record<VisualMode, string[]> = {
+    photo: [
+      "Create one highly realistic, well-composed, visually clean image.",
+      `Main subject to depict exactly: "${cleanPrompt}".`,
+      contextPart,
+      "Follow the request literally and accurately.",
+      "Use natural lighting, realistic materials, believable proportions, and a professional documentary or studio-photo look depending on the subject.",
+      "Keep the scene organized and focused on the requested subject only.",
+      "Do not add unrelated objects, symbolic elements, fantasy details, decorative text, or a cartoon look.",
+      "The result must look modern, sharp, and trustworthy.",
+    ],
+    technical_diagram: [
+      "Create one clean, modern, technically accurate engineering visual.",
+      `Main subject to depict exactly: "${cleanPrompt}".`,
+      contextPart,
+      "Use a neat academic or product-design presentation with organized composition and precise geometry.",
+      "Prefer a realistic technical visualization, product render, or schematic-style diagram depending on the subject.",
+      "Avoid clutter, scenery, decorative objects, fantasy details, and old low-quality AI aesthetics.",
+      "Do not include readable text, watermarks, or random symbols inside the image.",
+    ],
+    workflow_diagram: [
+      "Create one clean, modern workflow diagram on a light neutral background.",
+      `Main subject to depict exactly: "${cleanPrompt}".`,
+      contextPart,
+      "Show the process in an organized and technically accurate way using simple shapes, arrows, modules, or equipment as needed.",
+      "Keep the composition minimal, precise, and easy to understand.",
+      "Do not include readable text, decorative scenery, fantasy details, or unrelated objects.",
+    ],
+    map_infographic: [
+      "Create one clean, modern academic map infographic on a light background.",
+      `Main subject to depict exactly: "${cleanPrompt}".`,
+      contextPart,
+      "Use clear geographic highlighting and a precise, organized layout.",
+      "Keep the map simple, relevant, and visually trustworthy.",
+      "Do not include decorative scenery, unrelated icons, fantasy details, or readable text inside the image.",
+    ],
+    chart_infographic: [
+      "Create one clean, modern academic comparison infographic on a light background.",
+      `Main subject to depict exactly: "${cleanPrompt}".`,
+      contextPart,
+      "Use an organized visual layout with bars, shapes, icons, or panels only when directly relevant to the request.",
+      "Keep the infographic minimal, precise, and visually trustworthy.",
+      "Do not include decorative scenery, unrelated objects, fantasy details, or readable text inside the image.",
+    ],
+    ui_mockup: [
+      "Create one clean, modern, realistic interface mockup.",
+      `Main subject to depict exactly: "${cleanPrompt}".`,
+      contextPart,
+      "Use a precise, organized layout and contemporary professional UI styling.",
+      "Keep the composition clean and focused on the requested interface only.",
+      "Avoid decorative scenery, fantasy details, and unrelated objects.",
+      "Any on-screen text should be minimal and secondary to the layout.",
+    ],
+  };
+
+  return promptByMode[visualMode].filter(Boolean).join(" ");
+}
+
+async function validateGeneratedImage(candidateUrl: string, prompt: string, visualMode: VisualMode, context?: string): Promise<boolean> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return true;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: "You are a strict image-quality reviewer. Reject blank images, washed-out images, outdated low-quality AI-looking visuals, unrelated content, wrong visual type, and messy composition. Return ONLY 'PASS: ...' or 'FAIL: ...'.",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Requested visual type: ${visualMode}. Main request: ${prompt}.${context ? ` Context: ${context}.` : ""} Reject if the image is blank, mostly empty, off-topic, low-detail, outdated-looking, cartoonish when it should not be, or does not clearly satisfy the request.`,
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: candidateUrl,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("[generate-image] Validation call failed:", res.status, await res.text());
+      return true;
+    }
+
+    const data = await res.json();
+    const verdict = data?.choices?.[0]?.message?.content?.trim() || "";
+    console.log(`[generate-image] Validation verdict: ${verdict}`);
+    return verdict.toUpperCase().startsWith("PASS");
+  } catch (e) {
+    console.error("[generate-image] Validation error:", e);
+    return true;
+  }
 }
 
 function getSupabaseAdmin() {
@@ -228,7 +334,7 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   return uploadBytesToStorage(imageBytes, mimeType);
 }
 
-async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, context?: string): Promise<string | null> {
+async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, visualMode: VisualMode, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gateway) {
     console.log(`[generate-image] Trying Lovable gateway: ${model}`);
     try {
@@ -240,7 +346,7 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: "user", content: getPrompt(prompt, context) }],
+          messages: [{ role: "user", content: getPrompt(prompt, context, visualMode) }],
           modalities: ["image", "text"],
         }),
       });
@@ -252,7 +358,8 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
 
       const data = await res.json();
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (imageUrl) return imageUrl;
+      if (imageUrl && await validateGeneratedImage(imageUrl, prompt, visualMode, context)) return imageUrl;
+      if (imageUrl) console.warn(`[generate-image] Rejected low-quality image from ${model}`);
     } catch (e) {
       console.error(`[generate-image] Gateway ${model} error:`, e);
     }
@@ -261,7 +368,7 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
   return null;
 }
 
-async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset, context?: string): Promise<string | null> {
+async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset, visualMode: VisualMode, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gemini) {
     console.log(`[generate-image] Trying Gemini direct: ${model}`);
     try {
@@ -272,7 +379,7 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: getPrompt(prompt, context) }] }],
+          contents: [{ parts: [{ text: getPrompt(prompt, context, visualMode) }] }],
           generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
         }),
       });
@@ -286,7 +393,11 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
       const data = await res.json();
       for (const part of data?.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData?.data) {
-          return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+          const imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+          if (await validateGeneratedImage(imageUrl, prompt, visualMode, context)) {
+            return imageUrl;
+          }
+          console.warn(`[generate-image] Rejected low-quality image from ${model}`);
         }
       }
     } catch (e) {
@@ -400,7 +511,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, geminiApiKey, model, context } = await req.json();
+      const { prompt, geminiApiKey, model, context } = await req.json();
     const preset: ModelPreset = model === "pro" ? "pro" : "standard";
     const imageContext = context || "";
 
@@ -426,22 +537,24 @@ serve(async (req) => {
       finalPrompt = prompt;
     }
 
+    const visualMode = detectVisualMode(finalPrompt, finalContext);
     finalPrompt = await enhancePromptForRealism(finalPrompt, finalContext);
 
+    console.log(`[generate-image] Visual mode: ${visualMode}`);
     console.log(`[generate-image] Final prompt: "${finalPrompt}"`);
 
     let imageUrl: string | null = null;
     let usedModel = "unknown";
 
     if (geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, preset, finalContext);
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, preset, visualMode, finalContext);
       if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-user-pro" : "gemini-direct-user-flash";
     }
 
     if (!imageUrl) {
       const serverKey = Deno.env.get("GEMINI_API_KEY");
       if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, preset, finalContext);
+        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, preset, visualMode, finalContext);
         if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-server-pro" : "gemini-direct-server-flash";
       }
     }
@@ -449,23 +562,13 @@ serve(async (req) => {
     if (!imageUrl) {
       const lovableKey = Deno.env.get("LOVABLE_API_KEY");
       if (lovableKey) {
-        imageUrl = await generateWithLovableGateway(lovableKey, finalPrompt, preset, finalContext);
+        imageUrl = await generateWithLovableGateway(lovableKey, finalPrompt, preset, visualMode, finalContext);
         if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
       }
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
-      if (imageUrl) usedModel = "pollinations-free";
-    }
-
-    if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
-      if (imageUrl) usedModel = "cloudflare-workers-ai";
-    }
-
-    if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "Image generation failed - all providers exhausted" }), {
+      return new Response(JSON.stringify({ error: "High-quality image generation failed. Please retry in a moment." }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
