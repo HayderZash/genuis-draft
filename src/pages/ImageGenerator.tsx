@@ -4,13 +4,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, ImageIcon, Download, Sparkles, FileText, FileSpreadsheet, Trash2, Clock, Cpu } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, Sparkles, Trash2, Wand2, Image as ImageIcon } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,11 +18,6 @@ interface SavedImage {
   created_at: string;
 }
 
-const MODELS = [
-  { key: 'standard', label: 'Gemini Flash Image', labelAr: 'جيميني فلاش (سريع)' },
-  { key: 'pro', label: 'Gemini Pro Image', labelAr: 'جيميني برو (جودة عالية)' },
-];
-
 const ImageGenerator = () => {
   const { lang } = useLanguage();
   const { user } = useAuth();
@@ -35,7 +26,6 @@ const ImageGenerator = () => {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('standard');
   const [gallery, setGallery] = useState<SavedImage[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(true);
   const isAr = lang === 'ar';
@@ -63,7 +53,7 @@ const ImageGenerator = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { prompt: description.trim(), model: selectedModel },
+        body: { prompt: description.trim(), model: 'standard' },
       });
 
       if (error) throw new Error(error.message);
@@ -75,7 +65,7 @@ const ImageGenerator = () => {
           const { data: saved } = await supabase.from('generated_images').insert({
             user_id: user.id,
             prompt: description.trim(),
-            model: selectedModel,
+            model: data.model || 'standard',
             image_url: data.imageUrl,
           }).select().single();
           if (saved) setGallery(prev => [saved as SavedImage, ...prev]);
@@ -110,177 +100,116 @@ const ImageGenerator = () => {
     toast({ title: isAr ? 'تم حذف الصورة' : 'Image deleted' });
   };
 
-  const modelLabel = (key: string) => {
-    const m = MODELS.find(m => m.key === key);
-    return isAr ? m?.labelAr || key : m?.label || key;
-  };
-
   return (
-    <div className="container mx-auto max-w-5xl py-8 px-4" dir="rtl">
-      <Button variant="ghost" onClick={() => navigate('/')} className="gap-2 mb-6">
-        <ArrowLeft className="h-4 w-4 rotate-180" />
-        {isAr ? 'العودة للوحة التحكم' : 'Back to Dashboard'}
-      </Button>
+    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-b from-background to-muted/20" dir={isAr ? 'rtl' : 'ltr'}>
+      {/* Header */}
+      <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto max-w-4xl flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+            <ArrowLeft className={`h-4 w-4 ${isAr ? 'rotate-180' : ''}`} />
+            {isAr ? 'العودة' : 'Back'}
+          </Button>
+          <div className="flex items-center gap-2">
+            <Wand2 className="h-5 w-5 text-primary" />
+            <h1 className="font-bold text-lg">{isAr ? 'مُولد الصور' : 'Image Generator'}</h1>
+          </div>
+          <Badge variant="secondary" className="text-xs">0.1 {isAr ? 'نقطة' : 'pt'}</Badge>
+        </div>
+      </div>
 
-      <Tabs defaultValue="image-gen" className="w-full">
-        <TabsList className="w-full grid grid-cols-2 h-12 mb-8 bg-muted/60 rounded-xl p-1">
-          <TabsTrigger value="image-gen" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg text-sm font-semibold">
-            <ImageIcon className="h-4 w-4" />
-            {isAr ? 'مُولد الصور الذكي' : 'AI Image Generator'}
-          </TabsTrigger>
-          <TabsTrigger value="research" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg text-sm font-semibold">
-            <FileText className="h-4 w-4" />
-            {isAr ? 'البحوث والتقارير' : 'Research & Reports'}
-          </TabsTrigger>
-        </TabsList>
+      <div className="container mx-auto max-w-4xl px-4 py-8 space-y-8">
+        {/* Generator */}
+        <div className="relative rounded-2xl border bg-card p-6 shadow-sm">
+          <Textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder={isAr ? 'صِف الصورة التي تريد توليدها...\nمثال: قطة برتقالية تجلس على نافذة مع غروب الشمس' : 'Describe the image you want to generate...\ne.g. Orange cat sitting on a window with sunset'}
+            className="min-h-[100px] resize-none border-0 bg-transparent text-base focus-visible:ring-0 p-0 placeholder:text-muted-foreground/50"
+            dir="auto"
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generateImage(); } }}
+          />
+          <div className="flex items-center justify-between mt-4 pt-4 border-t">
+            <p className="text-xs text-muted-foreground">
+              {isAr ? 'اضغط Enter للتوليد • Shift+Enter لسطر جديد' : 'Press Enter to generate • Shift+Enter for new line'}
+            </p>
+            <Button
+              onClick={generateImage}
+              disabled={!description.trim() || loading}
+              size="sm"
+              className="gap-2 px-6 rounded-full"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {loading ? (isAr ? 'جاري التوليد...' : 'Generating...') : (isAr ? 'توليد' : 'Generate')}
+            </Button>
+          </div>
+        </div>
 
-        <TabsContent value="image-gen" className="space-y-6">
-          <div className="text-center mb-6">
-            <div className="inline-flex p-4 rounded-2xl bg-primary/10 mb-4">
-              <ImageIcon className="h-10 w-10 text-primary" />
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center gap-4 py-12">
+            <div className="relative">
+              <div className="h-16 w-16 rounded-full border-4 border-muted animate-pulse" />
+              <Loader2 className="h-8 w-8 text-primary animate-spin absolute top-4 left-4" />
             </div>
-            <h1 className="text-2xl font-bold">{isAr ? 'مُولد الصور الذكي' : 'AI Image Generator'}</h1>
-            <p className="text-muted-foreground mt-2">
-              {isAr ? 'أنشئ صورًا دقيقة بالذكاء الاصطناعي • تكلفة 0.1 نقطة' : 'Generate precise AI images • Costs 0.1 points'}
+            <p className="text-sm text-muted-foreground animate-pulse">
+              {isAr ? 'جاري إنشاء صورتك... قد يستغرق 10-30 ثانية' : 'Creating your image... may take 10-30 seconds'}
             </p>
           </div>
+        )}
 
-          <Card className="border-border/50 shadow-lg">
-            <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2">
-                <Label className="font-semibold">{isAr ? 'وصف الصورة المطلوبة' : 'Image description'}</Label>
-                <Input
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder={isAr ? 'مثال: صورة بطاطا طازجة على خلفية بيضاء' : 'e.g. Fresh potatoes on white background'}
-                  onKeyDown={e => e.key === 'Enter' && generateImage()}
-                  className="h-12 text-base"
-                  dir="auto"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="font-semibold flex items-center gap-2">
-                  <Cpu className="h-4 w-4" />
-                  {isAr ? 'جودة الصورة' : 'Image Quality'}
-                </Label>
-                <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MODELS.map(m => (
-                      <SelectItem key={m.key} value={m.key}>{isAr ? m.labelAr : m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button onClick={generateImage} disabled={!description.trim() || loading} className="w-full gap-2 h-12 text-base font-semibold">
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                {loading ? (isAr ? 'جاري التوليد...' : 'Generating...') : (isAr ? 'توليد الصورة' : 'Generate Image')}
+        {/* Generated Image */}
+        {imageUrl && !loading && (
+          <div className="rounded-2xl border bg-card overflow-hidden shadow-sm">
+            <div className="bg-muted/30">
+              <img src={imageUrl} alt="Generated" className="w-full h-auto max-h-[500px] object-contain" />
+            </div>
+            <div className="p-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground truncate flex-1 me-4">{description}</p>
+              <Button onClick={() => downloadImage(imageUrl)} size="sm" variant="outline" className="gap-2 rounded-full shrink-0">
+                <Download className="h-4 w-4" />
+                {isAr ? 'تحميل' : 'Download'}
               </Button>
-            </CardContent>
-          </Card>
-
-          {loading && (
-            <Card className="border-border/50">
-              <CardContent className="py-16 flex flex-col items-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">{isAr ? 'جاري التوليد... قد يستغرق 10-30 ثانية' : 'Generating... may take 10-30 seconds'}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {imageUrl && !loading && (
-            <Card className="border-border/50 shadow-lg overflow-hidden">
-              <CardContent className="pt-6 space-y-4">
-                <div className="rounded-xl overflow-hidden border bg-muted">
-                  <img src={imageUrl} alt="Generated" className="w-full h-auto" />
-                </div>
-                <Button onClick={() => downloadImage(imageUrl)} variant="outline" className="w-full gap-2 h-11">
-                  <Download className="h-4 w-4" />
-                  {isAr ? 'تحميل الصورة' : 'Download Image'}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Gallery */}
-          <div className="pt-4">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              {isAr ? 'معرض الصور السابقة' : 'Previous Images Gallery'}
-            </h2>
-            {galleryLoading ? (
-              <div className="text-center py-8 text-muted-foreground">...</div>
-            ) : gallery.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  <ImageIcon className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                  <p>{isAr ? 'لا توجد صور سابقة' : 'No previous images'}</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {gallery.map(img => (
-                  <Card key={img.id} className="group overflow-hidden border-border/50 hover:shadow-lg transition-all">
-                    <div className="aspect-square overflow-hidden bg-muted">
-                      <img src={img.image_url} alt={img.prompt} className="w-full h-full object-cover" />
-                    </div>
-                    <CardContent className="p-3 space-y-2">
-                      <p className="text-sm font-medium truncate" title={img.prompt}>{img.prompt}</p>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="text-xs">{modelLabel(img.model)}</Badge>
-                        <span className="text-xs text-muted-foreground">{new Date(img.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="flex-1 gap-1" onClick={() => downloadImage(img.image_url)}>
-                          <Download className="h-3 w-3" />
-                          {isAr ? 'تحميل' : 'Download'}
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteImage(img.id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="research">
-          <div className="text-center mb-8">
-            <div className="inline-flex p-4 rounded-2xl bg-primary/10 mb-4">
-              <FileText className="h-10 w-10 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold">{isAr ? 'البحوث والتقارير' : 'Research & Reports'}</h1>
-            <p className="text-muted-foreground mt-2">
-              {isAr ? 'الوصول السريع لإنشاء بحوث وتقارير أكاديمية' : 'Quick access to create academic research and reports'}
-            </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="group cursor-pointer border-border/50 hover:border-primary/40 hover:shadow-xl transition-all duration-300" onClick={() => navigate('/research')}>
-              <CardContent className="p-8 text-center">
-                <div className="inline-flex p-4 rounded-2xl bg-primary/10 group-hover:bg-primary/20 transition-colors mb-4">
-                  <FileText className="h-8 w-8 text-primary" />
+        )}
+
+        {/* Gallery */}
+        {!galleryLoading && gallery.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+              {isAr ? 'الصور السابقة' : 'Previous Images'}
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {gallery.map(img => (
+                <div key={img.id} className="group relative rounded-xl overflow-hidden border bg-card hover:shadow-md transition-all">
+                  <div className="aspect-square overflow-hidden bg-muted">
+                    <img src={img.image_url} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  </div>
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3">
+                    <p className="text-white text-xs text-center line-clamp-3">{img.prompt}</p>
+                    <div className="flex gap-2">
+                      <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full" onClick={() => downloadImage(img.image_url)}>
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="destructive" className="h-8 w-8 rounded-full" onClick={() => deleteImage(img.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="font-bold text-lg mb-2">{isAr ? 'البحوث الأكاديمية' : 'Academic Research'}</h3>
-                <p className="text-sm text-muted-foreground">{isAr ? 'إنشاء بحوث تخرج كاملة' : 'Create full graduation research'}</p>
-              </CardContent>
-            </Card>
-            <Card className="group cursor-pointer border-border/50 hover:border-primary/40 hover:shadow-xl transition-all duration-300" onClick={() => navigate('/reports')}>
-              <CardContent className="p-8 text-center">
-                <div className="inline-flex p-4 rounded-2xl bg-accent group-hover:bg-accent/80 transition-colors mb-4">
-                  <FileSpreadsheet className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="font-bold text-lg mb-2">{isAr ? 'التقارير العلمية' : 'Scientific Reports'}</h3>
-                <p className="text-sm text-muted-foreground">{isAr ? 'إنشاء تقارير احترافية' : 'Create professional reports'}</p>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+
+        {!galleryLoading && gallery.length === 0 && !imageUrl && !loading && (
+          <div className="text-center py-16">
+            <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground/20 mb-4" />
+            <p className="text-muted-foreground">{isAr ? 'ابدأ بكتابة وصف لتوليد أول صورة' : 'Start by writing a description to generate your first image'}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
