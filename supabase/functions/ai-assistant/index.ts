@@ -187,6 +187,37 @@ async function fetchWikipediaSummary(query: string, language?: string): Promise<
     : `AI providers are temporarily unavailable, but here is a quick reference summary on the topic:\n\n${extract}`;
 }
 
+async function callPollinations(messages: ChatMessage[], language?: string): Promise<AssistantResult> {
+  try {
+    const response = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai",
+        messages: [
+          { role: "system", content: getSystemPrompt(language) },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ],
+        max_tokens: 4000,
+        temperature: 0.4,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("[ai-assistant] Pollinations error:", response.status, text);
+      return { reply: null, error: "Pollinations error", status: response.status };
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content?.trim() || "";
+    return { reply: reply || null, error: reply ? null : "Empty Pollinations response", status: reply ? 200 : 502 };
+  } catch (e) {
+    console.error("[ai-assistant] Pollinations exception:", e);
+    return { reply: null, error: "Pollinations exception", status: 500 };
+  }
+}
+
 async function callReferenceFallback(messages: ChatMessage[], language?: string): Promise<AssistantResult> {
   const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content?.trim();
   if (!latestUserMessage) {
@@ -223,6 +254,10 @@ serve(async (req) => {
 
     if (!result.reply) {
       result = await callConfiguredProvider(safeMessages, language, provider, apiKey);
+    }
+
+    if (!result.reply) {
+      result = await callPollinations(safeMessages, language);
     }
 
     if (!result.reply) {
