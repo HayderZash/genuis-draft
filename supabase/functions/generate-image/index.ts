@@ -185,11 +185,12 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
   return null;
 }
 
-async function generateWithPollinations(prompt: string): Promise<string | null> {
+async function generateWithPollinations(prompt: string, context?: string): Promise<string | null> {
   console.log("[generate-image] Using Pollinations.ai (free)");
   try {
-    const shortPrompt = prompt.substring(0, 200);
-    const encodedPrompt = encodeURIComponent(`${shortPrompt}, professional, clean, academic style, illustration`);
+    const fullPrompt = context ? `${prompt}, related to ${context}` : prompt;
+    const shortPrompt = fullPrompt.substring(0, 200);
+    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic, professional, academic research illustration, detailed, high quality`);
     const seed = Math.floor(Math.random() * 100000);
     const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&seed=${seed}`;
 
