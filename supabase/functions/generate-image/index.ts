@@ -38,18 +38,15 @@ async function generateWithLovableGateway(apiKey: string, prompt: string): Promi
 }
 
 async function generateWithPollinations(prompt: string): Promise<string | null> {
-  console.log("[generate-image] Trying Pollinations.ai (free)");
+  console.log("[generate-image] Using Pollinations.ai (free)");
   try {
-    const encodedPrompt = encodeURIComponent(`Professional academic illustration: ${prompt}, clean, high quality, suitable for research paper`);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${Date.now()}`;
-    
-    // Verify the URL works by doing a HEAD request
-    const check = await fetch(imageUrl, { method: "GET", redirect: "follow" });
-    if (check.ok) {
-      console.log("[generate-image] Pollinations.ai success");
-      return imageUrl;
-    }
-    console.error(`[generate-image] Pollinations check failed: ${check.status}`);
+    // Pollinations generates images on-the-fly via URL - no verification needed
+    const shortPrompt = prompt.substring(0, 200);
+    const encodedPrompt = encodeURIComponent(`${shortPrompt}, professional, clean, academic style`);
+    const seed = Math.floor(Math.random() * 100000);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
+    console.log("[generate-image] Pollinations.ai URL generated");
+    return imageUrl;
   } catch (e) {
     console.error("[generate-image] Pollinations error:", e);
   }
