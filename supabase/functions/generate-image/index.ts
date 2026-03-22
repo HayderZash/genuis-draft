@@ -55,7 +55,7 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   return uploadBytesToStorage(imageBytes, mimeType);
 }
 
-async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset): Promise<string | null> {
+async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gateway) {
     console.log(`[generate-image] Trying Lovable gateway: ${model}`);
     try {
@@ -67,7 +67,7 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: "user", content: getPrompt(prompt) }],
+          messages: [{ role: "user", content: getPrompt(prompt, context) }],
           modalities: ["image", "text"],
         }),
       });
