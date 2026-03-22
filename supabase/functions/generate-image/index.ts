@@ -24,6 +24,86 @@ function containsArabic(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
+function extractTextFromGeminiResponse(data: any): string | null {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const text = parts
+    .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+    .join(" ")
+    .trim();
+
+  return text || null;
+}
+
+async function runGeminiTextTask(system: string, user: string): Promise<string | null> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 300,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("[generate-image] Gemini text task failed:", res.status, await res.text());
+      return null;
+    }
+
+    return extractTextFromGeminiResponse(await res.json());
+  } catch (e) {
+    console.error("[generate-image] Gemini text task error:", e);
+    return null;
+  }
+}
+
+async function runLovableTextTask(system: string, user: string): Promise<string | null> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return null;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("[generate-image] Lovable text task failed:", res.status, await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error("[generate-image] Lovable text task error:", e);
+    return null;
+  }
+}
+
+async function runTextTask(system: string, user: string): Promise<string | null> {
+  return await runGeminiTextTask(system, user) || await runLovableTextTask(system, user);
+}
+
 const DEFAULT_NEGATIVE_PROMPT = [
   "cartoon",
   "illustration",
@@ -54,33 +134,13 @@ const DEFAULT_NEGATIVE_PROMPT = [
 
 // Translate Arabic prompt to English using Lovable AI Gateway
 async function translateToEnglish(text: string): Promise<string> {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!lovableKey) return text;
-
   try {
     console.log("[generate-image] Translating Arabic prompt to English...");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Translate the following user request into precise English for text-to-image generation. Preserve the exact subject, action, setting, and important details. Do not add new objects or artistic style words unless they are explicitly mentioned. Return ONLY the English translation.",
-          },
-          { role: "user", content: text },
-        ],
-      }),
-    });
+    const translated = await runTextTask(
+      "Translate the following user request into precise English for text-to-image generation. Preserve the exact subject, action, setting, and important details. Do not add new objects or artistic style words unless they are explicitly mentioned. Return ONLY the English translation.",
+      text,
+    );
 
-    if (!res.ok) return text;
-    const data = await res.json();
-    const translated = data.choices?.[0]?.message?.content?.trim();
     if (translated) {
       console.log(`[generate-image] Translated: "${text}" → "${translated}"`);
       return translated;
@@ -93,6 +153,27 @@ async function translateToEnglish(text: string): Promise<string> {
 
 function normalizePrompt(prompt: string): string {
   return prompt.replace(/\s+/g, " ").trim();
+}
+
+async function enhancePromptForRealism(prompt: string, context?: string): Promise<string> {
+  const normalizedPrompt = normalizePrompt(prompt);
+  const normalizedContext = context ? normalizePrompt(context) : "";
+
+  try {
+    const enhanced = await runTextTask(
+      "You rewrite prompts for photorealistic image generation. Preserve the exact subject and meaning. Make the wording more precise, realistic, visually grounded, and accurate. Do not add unrelated objects, architecture, symbolism, fantasy details, or art styles. Return only one concise English prompt.",
+      `Main request: ${normalizedPrompt}${normalizedContext ? `\nContext: ${normalizedContext}` : ""}`,
+    );
+
+    if (enhanced) {
+      console.log(`[generate-image] Enhanced prompt: "${enhanced}"`);
+      return normalizePrompt(enhanced);
+    }
+  } catch (e) {
+    console.error("[generate-image] Prompt enhancement failed:", e);
+  }
+
+  return normalizedPrompt;
 }
 
 function getPrompt(prompt: string, context?: string) {
@@ -288,7 +369,7 @@ async function generateWithPollinations(prompt: string, context?: string): Promi
     const shortPrompt = fullPrompt.substring(0, 200);
     const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic real-life photo, realistic lighting, accurate subject, clean composition, professional photography, highly detailed, no illustration, no cartoon, no text`);
     const seed = Math.floor(Math.random() * 100000);
-    const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&seed=${seed}`;
+    const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&enhance=true&model=flux&seed=${seed}`;
 
     const imageResponse = await fetch(remoteUrl, {
       headers: { Accept: "image/png,image/jpeg,image/webp,*/*" },
@@ -345,6 +426,8 @@ serve(async (req) => {
       finalPrompt = prompt;
     }
 
+    finalPrompt = await enhancePromptForRealism(finalPrompt, finalContext);
+
     console.log(`[generate-image] Final prompt: "${finalPrompt}"`);
 
     let imageUrl: string | null = null;
@@ -372,13 +455,13 @@ serve(async (req) => {
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
-      if (imageUrl) usedModel = "cloudflare-workers-ai";
+      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
+      if (imageUrl) usedModel = "pollinations-free";
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
-      if (imageUrl) usedModel = "pollinations-free";
+      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
+      if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
