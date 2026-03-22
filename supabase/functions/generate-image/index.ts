@@ -24,13 +24,54 @@ function containsArabic(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
-// Translate Arabic prompt to English using Lovable AI Gateway
-async function translateToEnglish(text: string): Promise<string> {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!lovableKey) return text;
+function extractTextFromGeminiResponse(data: any): string | null {
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const text = parts
+    .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+    .join(" ")
+    .trim();
+
+  return text || null;
+}
+
+async function runGeminiTextTask(system: string, user: string): Promise<string | null> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) return null;
 
   try {
-    console.log("[generate-image] Translating Arabic prompt to English...");
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 300,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("[generate-image] Gemini text task failed:", res.status, await res.text());
+      return null;
+    }
+
+    return extractTextFromGeminiResponse(await res.json());
+  } catch (e) {
+    console.error("[generate-image] Gemini text task error:", e);
+    return null;
+  }
+}
+
+async function runLovableTextTask(system: string, user: string): Promise<string | null> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return null;
+
+  try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -40,15 +81,66 @@ async function translateToEnglish(text: string): Promise<string> {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite",
         messages: [
-          { role: "system", content: "Translate the following text to English. Return ONLY the English translation, nothing else. Keep it concise and descriptive." },
-          { role: "user", content: text },
+          { role: "system", content: system },
+          { role: "user", content: user },
         ],
       }),
     });
 
-    if (!res.ok) return text;
+    if (!res.ok) {
+      console.error("[generate-image] Lovable text task failed:", res.status, await res.text());
+      return null;
+    }
+
     const data = await res.json();
-    const translated = data.choices?.[0]?.message?.content?.trim();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error("[generate-image] Lovable text task error:", e);
+    return null;
+  }
+}
+
+async function runTextTask(system: string, user: string): Promise<string | null> {
+  return await runGeminiTextTask(system, user) || await runLovableTextTask(system, user);
+}
+
+const DEFAULT_NEGATIVE_PROMPT = [
+  "cartoon",
+  "illustration",
+  "drawing",
+  "painting",
+  "anime",
+  "comic",
+  "3d render",
+  "cgi",
+  "stylized",
+  "abstract",
+  "fantasy",
+  "surreal",
+  "deformed",
+  "distorted",
+  "extra limbs",
+  "bad anatomy",
+  "unrealistic face",
+  "blurry",
+  "low detail",
+  "low quality",
+  "text",
+  "watermark",
+  "logo",
+  "caption",
+  "unrelated objects",
+].join(", ");
+
+// Translate Arabic prompt to English using Lovable AI Gateway
+async function translateToEnglish(text: string): Promise<string> {
+  try {
+    console.log("[generate-image] Translating Arabic prompt to English...");
+    const translated = await runTextTask(
+      "Translate the following user request into precise English for text-to-image generation. Preserve the exact subject, action, setting, and important details. Do not add new objects or artistic style words unless they are explicitly mentioned. Return ONLY the English translation.",
+      text,
+    );
+
     if (translated) {
       console.log(`[generate-image] Translated: "${text}" → "${translated}"`);
       return translated;
@@ -59,9 +151,50 @@ async function translateToEnglish(text: string): Promise<string> {
   return text;
 }
 
+function normalizePrompt(prompt: string): string {
+  return prompt.replace(/\s+/g, " ").trim();
+}
+
+async function enhancePromptForRealism(prompt: string, context?: string): Promise<string> {
+  const normalizedPrompt = normalizePrompt(prompt);
+  const normalizedContext = context ? normalizePrompt(context) : "";
+
+  try {
+    const enhanced = await runTextTask(
+      "You rewrite prompts for photorealistic image generation. Preserve the exact subject and meaning. Make the wording more precise, realistic, visually grounded, and accurate. Do not add unrelated objects, architecture, symbolism, fantasy details, or art styles. Return only one concise English prompt.",
+      `Main request: ${normalizedPrompt}${normalizedContext ? `\nContext: ${normalizedContext}` : ""}`,
+    );
+
+    if (enhanced) {
+      console.log(`[generate-image] Enhanced prompt: "${enhanced}"`);
+      return normalizePrompt(enhanced);
+    }
+  } catch (e) {
+    console.error("[generate-image] Prompt enhancement failed:", e);
+  }
+
+  return normalizedPrompt;
+}
+
 function getPrompt(prompt: string, context?: string) {
-  const contextPart = context ? ` for a research paper about "${context}"` : '';
-  return `Create a realistic, high-quality illustration${contextPart}. The image must clearly and accurately depict: ${prompt}. Requirements: photorealistic style, professional quality, relevant and accurate to the described subject, clean composition, no watermarks, minimal or no text in the image.`;
+  const cleanPrompt = normalizePrompt(prompt);
+  const cleanContext = context ? normalizePrompt(context) : "";
+  const contextPart = cleanContext
+    ? ` Context/topic: "${cleanContext}". Use it only to improve relevance and do not let it override the main subject.`
+    : "";
+
+  return [
+    "Create one highly realistic, well-composed, visually clean, photorealistic image.",
+    `Main subject to depict exactly: "${cleanPrompt}".`,
+    contextPart,
+    "Follow the user description literally and accurately.",
+    "Use natural lighting, realistic materials, believable proportions, and a professional documentary or studio-photo look depending on the subject.",
+    "Keep the scene organized and focused on the requested subject only.",
+    "Do not add unrelated objects, symbolic elements, fantasy details, or decorative text.",
+    "The result must look like a real photo, not an illustration.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function getSupabaseAdmin() {
@@ -171,8 +304,8 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
   if (!accountId || !apiToken) return null;
 
   const models = [
-    "@cf/bytedance/stable-diffusion-xl-lightning",
     "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+    "@cf/bytedance/stable-diffusion-xl-lightning",
   ];
 
   for (const model of models) {
@@ -187,7 +320,11 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
         },
         body: JSON.stringify({
           prompt: getPrompt(prompt, context),
-          num_steps: 20,
+          negative_prompt: DEFAULT_NEGATIVE_PROMPT,
+          num_steps: model.includes("lightning") ? 8 : 28,
+          guidance: model.includes("lightning") ? 7.5 : 11,
+          width: 1024,
+          height: 768,
         }),
       });
 
@@ -230,9 +367,9 @@ async function generateWithPollinations(prompt: string, context?: string): Promi
   try {
     const fullPrompt = context ? `${prompt}, related to ${context}` : prompt;
     const shortPrompt = fullPrompt.substring(0, 200);
-    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic, professional, academic research illustration, detailed, high quality`);
+    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic real-life photo, realistic lighting, accurate subject, clean composition, professional photography, highly detailed, no illustration, no cartoon, no text`);
     const seed = Math.floor(Math.random() * 100000);
-    const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&seed=${seed}`;
+    const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&enhance=true&model=flux&seed=${seed}`;
 
     const imageResponse = await fetch(remoteUrl, {
       headers: { Accept: "image/png,image/jpeg,image/webp,*/*" },
@@ -289,6 +426,8 @@ serve(async (req) => {
       finalPrompt = prompt;
     }
 
+    finalPrompt = await enhancePromptForRealism(finalPrompt, finalContext);
+
     console.log(`[generate-image] Final prompt: "${finalPrompt}"`);
 
     let imageUrl: string | null = null;
@@ -316,13 +455,13 @@ serve(async (req) => {
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
-      if (imageUrl) usedModel = "cloudflare-workers-ai";
+      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
+      if (imageUrl) usedModel = "pollinations-free";
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
-      if (imageUrl) usedModel = "pollinations-free";
+      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
+      if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
