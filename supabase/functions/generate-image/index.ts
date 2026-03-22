@@ -88,7 +88,7 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
   return null;
 }
 
-async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset): Promise<string | null> {
+async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gemini) {
     console.log(`[generate-image] Trying Gemini direct: ${model}`);
     try {
@@ -99,7 +99,7 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: getPrompt(prompt) }] }],
+          contents: [{ parts: [{ text: getPrompt(prompt, context) }] }],
           generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
         }),
       });
