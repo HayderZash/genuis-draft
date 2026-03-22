@@ -6,84 +6,80 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise<string | null> {
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash-exp"];
-
+async function generateWithLovableGateway(apiKey: string, prompt: string): Promise<string | null> {
+  const models = ["google/gemini-3.1-flash-image-preview", "google/gemini-2.5-flash-image", "google/gemini-3-pro-image-preview"];
   for (const model of models) {
-    console.log(`[generate-image] Trying Gemini model: ${model}`);
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    
+    console.log(`[generate-image] Trying Lovable gateway: ${model}`);
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.` }] }],
-          generationConfig: {
-            responseModalities: ["IMAGE", "TEXT"],
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        console.error(`[generate-image] Model ${model} error: ${response.status} ${errText.substring(0, 300)}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const parts = data?.candidates?.[0]?.content?.parts || [];
-      for (const part of parts) {
-        if (part.inlineData) {
-          console.log(`[generate-image] Success with model: ${model}`);
-          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        }
-      }
-      console.error(`[generate-image] No image in response from ${model}`);
-    } catch (e) {
-      console.error(`[generate-image] Exception with ${model}:`, e);
-    }
-  }
-  return null;
-}
-
-async function generateWithLovableGateway(apiKey: string, prompt: string, modelKey: string): Promise<string | null> {
-  // Use image generation models
-  const models = [
-    modelKey === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-3.1-flash-image-preview",
-    "google/gemini-2.5-flash-image",
-  ];
-  
-  for (const selectedModel of models) {
-    console.log(`[generate-image] Trying Lovable gateway model: ${selectedModel}`);
-    try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: selectedModel,
-          messages: [{ role: "user", content: `Generate a professional, high-quality academic illustration: ${prompt}. Style: clean, professional, suitable for academic research paper.` }],
+          model,
+          messages: [{ role: "user", content: `Generate a professional academic illustration: ${prompt}` }],
           modalities: ["image", "text"],
         }),
       });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        console.error(`[generate-image] Lovable gateway ${selectedModel} error: ${response.status} ${errText.substring(0, 300)}`);
+      if (!res.ok) {
+        console.error(`[generate-image] Gateway ${model}: ${res.status}`);
         continue;
       }
-
-      const data = await response.json();
+      const data = await res.json();
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (imageUrl) {
-        console.log(`[generate-image] Lovable gateway success with ${selectedModel}`);
-        return imageUrl;
+      if (imageUrl) return imageUrl;
+    } catch (e) {
+      console.error(`[generate-image] Gateway ${model} error:`, e);
+    }
+  }
+  return null;
+}
+
+async function generateWithPollinations(prompt: string): Promise<string | null> {
+  console.log("[generate-image] Using Pollinations.ai (free)");
+  try {
+    // Pollinations generates images on-the-fly via URL - no verification needed
+    const shortPrompt = prompt.substring(0, 200);
+    const encodedPrompt = encodeURIComponent(`${shortPrompt}, professional, clean, academic style`);
+    const seed = Math.floor(Math.random() * 100000);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
+    console.log("[generate-image] Pollinations.ai URL generated");
+    return imageUrl;
+  } catch (e) {
+    console.error("[generate-image] Pollinations error:", e);
+  }
+  return null;
+}
+
+async function generateWithGeminiDirect(apiKey: string, prompt: string): Promise<string | null> {
+  // Use imagen model for image generation
+  const models = ["gemini-2.0-flash-exp"];
+  for (const model of models) {
+    console.log(`[generate-image] Trying Gemini direct: ${model}`);
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Generate a professional academic illustration: ${prompt}` }] }],
+          generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+        }),
+      });
+      if (!res.ok) {
+        console.error(`[generate-image] ${model}: ${res.status}`);
+        continue;
+      }
+      const data = await res.json();
+      for (const part of (data?.candidates?.[0]?.content?.parts || [])) {
+        if (part.inlineData) {
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
       }
     } catch (e) {
-      console.error(`[generate-image] Lovable gateway ${selectedModel} exception:`, e);
+      console.error(`[generate-image] ${model} error:`, e);
     }
   }
   return null;
@@ -96,7 +92,6 @@ async function uploadToStorage(base64Url: string): Promise<string> {
 
   const base64Data = base64Url.replace(/^data:image\/\w+;base64,/, "");
   const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-  
   const fileName = `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`;
   const filePath = `generated/${fileName}`;
 
@@ -106,11 +101,10 @@ async function uploadToStorage(base64Url: string): Promise<string> {
 
   if (error) {
     console.error("Storage upload failed:", error.message);
-    return base64Url; // fallback to inline
+    return base64Url;
   }
 
   const { data: publicUrlData } = supabase.storage.from("research-images").getPublicUrl(filePath);
-  console.log(`[generate-image] Uploaded: ${publicUrlData.publicUrl}`);
   return publicUrlData.publicUrl;
 }
 
@@ -118,47 +112,56 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, model: modelKey, geminiApiKey } = await req.json();
+    const { prompt, geminiApiKey } = await req.json();
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Missing prompt" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SERVER_GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
-    let base64Url: string | null = null;
+    let imageUrl: string | null = null;
     let usedModel = "unknown";
 
-    // Strategy 1: User's Gemini API key (direct)
+    // Strategy 1: User Gemini key
     if (geminiApiKey) {
-      console.log("[generate-image] Strategy 1: User Gemini key");
-      base64Url = await generateWithGeminiDirect(geminiApiKey, prompt);
-      if (base64Url) usedModel = "gemini-direct-user";
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt);
+      if (imageUrl) usedModel = "gemini-direct-user";
     }
 
-    // Strategy 2: Server Gemini API key (direct)
-    if (!base64Url && SERVER_GEMINI_KEY) {
-      console.log("[generate-image] Strategy 2: Server Gemini key");
-      base64Url = await generateWithGeminiDirect(SERVER_GEMINI_KEY, prompt);
-      if (base64Url) usedModel = "gemini-direct-server";
+    // Strategy 2: Server Gemini key
+    if (!imageUrl) {
+      const serverKey = Deno.env.get("GEMINI_API_KEY");
+      if (serverKey) {
+        imageUrl = await generateWithGeminiDirect(serverKey, prompt);
+        if (imageUrl) usedModel = "gemini-direct-server";
+      }
     }
 
-    // Strategy 3: Lovable Gateway (image models)
-    if (!base64Url && LOVABLE_API_KEY) {
-      console.log("[generate-image] Strategy 3: Lovable Gateway");
-      base64Url = await generateWithLovableGateway(LOVABLE_API_KEY, prompt, modelKey || "standard");
-      if (base64Url) usedModel = "lovable-gateway";
+    // Strategy 3: Lovable Gateway
+    if (!imageUrl) {
+      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+      if (lovableKey) {
+        imageUrl = await generateWithLovableGateway(lovableKey, prompt);
+        if (imageUrl) usedModel = "lovable-gateway";
+      }
     }
 
-    if (!base64Url) {
-      return new Response(JSON.stringify({ error: "Image generation failed - no available provider. Please check your Gemini API key quota." }), {
+    // Strategy 4: Pollinations.ai (FREE, no API key needed)
+    if (!imageUrl) {
+      imageUrl = await generateWithPollinations(prompt);
+      if (imageUrl) usedModel = "pollinations-free";
+    }
+
+    if (!imageUrl) {
+      return new Response(JSON.stringify({ error: "Image generation failed - all providers exhausted" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Upload to storage
-    const imageUrl = await uploadToStorage(base64Url);
+    // Upload base64 to storage if needed
+    if (imageUrl.startsWith("data:")) {
+      imageUrl = await uploadToStorage(imageUrl);
+    }
 
     return new Response(JSON.stringify({ imageUrl, model: usedModel }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

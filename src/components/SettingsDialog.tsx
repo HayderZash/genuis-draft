@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ export function getProviderKey(provider: AIProvider): string {
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
+  const { saveMultipleSettings, syncToLocal } = useUserSettings();
 
   // Single provider mode
   const [provider, setProvider] = useState<AIProvider>('openai');
@@ -64,25 +66,28 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
   useEffect(() => {
     if (open) {
-      const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
-      setProvider(savedProvider);
-      setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
-      setShowKey(false);
+      // First sync from DB to localStorage, then load
+      syncToLocal().then(() => {
+        const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+        setProvider(savedProvider);
+        setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
+        setShowKey(false);
 
-      const merge = localStorage.getItem('ai_merge_mode') === 'true';
-      setMergeMode(merge);
-      setMergeProviders(JSON.parse(localStorage.getItem('ai_merge_providers') || '[]'));
+        const merge = localStorage.getItem('ai_merge_mode') === 'true';
+        setMergeMode(merge);
+        setMergeProviders(JSON.parse(localStorage.getItem('ai_merge_providers') || '[]'));
 
-      const keys: Record<string, string> = {};
-      const shows: Record<string, boolean> = {};
-      ALL_PROVIDERS.forEach(p => {
-        keys[p.value] = localStorage.getItem(PROVIDER_KEY_MAP[p.value]) || '';
-        shows[p.value] = false;
+        const keys: Record<string, string> = {};
+        const shows: Record<string, boolean> = {};
+        ALL_PROVIDERS.forEach(p => {
+          keys[p.value] = localStorage.getItem(PROVIDER_KEY_MAP[p.value]) || '';
+          shows[p.value] = false;
+        });
+        setMergeKeys(keys as any);
+        setShowMergeKeys(shows as any);
       });
-      setMergeKeys(keys as any);
-      setShowMergeKeys(shows as any);
     }
-  }, [open]);
+  }, [open, syncToLocal]);
 
   const handleProviderChange = (val: AIProvider) => {
     setProvider(val);
@@ -94,21 +99,24 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
     setMergeProviders(prev => checked ? [...prev, p] : prev.filter(x => x !== p));
   };
 
-  const handleSave = () => {
-    localStorage.setItem('ai_merge_mode', mergeMode ? 'true' : 'false');
+  const handleSave = async () => {
+    const settings: Record<string, string> = {
+      ai_merge_mode: mergeMode ? 'true' : 'false',
+    };
 
     if (mergeMode) {
-      localStorage.setItem('ai_merge_providers', JSON.stringify(mergeProviders));
+      settings.ai_merge_providers = JSON.stringify(mergeProviders);
       ALL_PROVIDERS.forEach(p => {
         if (mergeKeys[p.value]) {
-          localStorage.setItem(PROVIDER_KEY_MAP[p.value], mergeKeys[p.value]);
+          settings[PROVIDER_KEY_MAP[p.value]] = mergeKeys[p.value];
         }
       });
     } else {
-      localStorage.setItem('ai_provider', provider);
-      localStorage.setItem(PROVIDER_KEY_MAP[provider], apiKey);
+      settings.ai_provider = provider;
+      settings[PROVIDER_KEY_MAP[provider]] = apiKey;
     }
 
+    await saveMultipleSettings(settings);
     toast({ title: t('apiKeySaved') });
     onOpenChange(false);
   };
