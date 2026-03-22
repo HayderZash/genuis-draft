@@ -19,9 +19,49 @@ const MODEL_MAP = {
 
 type ModelPreset = keyof typeof MODEL_MAP;
 
+// Detect if text contains Arabic/non-Latin characters
+function containsArabic(text: string): boolean {
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
+}
+
+// Translate Arabic prompt to English using Lovable AI Gateway
+async function translateToEnglish(text: string): Promise<string> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return text;
+
+  try {
+    console.log("[generate-image] Translating Arabic prompt to English...");
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: "Translate the following text to English. Return ONLY the English translation, nothing else. Keep it concise and descriptive." },
+          { role: "user", content: text },
+        ],
+      }),
+    });
+
+    if (!res.ok) return text;
+    const data = await res.json();
+    const translated = data.choices?.[0]?.message?.content?.trim();
+    if (translated) {
+      console.log(`[generate-image] Translated: "${text}" → "${translated}"`);
+      return translated;
+    }
+  } catch (e) {
+    console.error("[generate-image] Translation failed:", e);
+  }
+  return text;
+}
+
 function getPrompt(prompt: string, context?: string) {
   const contextPart = context ? ` for a research paper about "${context}"` : '';
-  return `Create a realistic, high-quality academic illustration${contextPart}. The image must clearly and accurately depict: ${prompt}. Requirements: photorealistic or detailed scientific diagram style, professional quality suitable for an academic paper, relevant and accurate to the described subject, clean composition, no watermarks, minimal or no text in the image.`;
+  return `Create a realistic, high-quality illustration${contextPart}. The image must clearly and accurately depict: ${prompt}. Requirements: photorealistic style, professional quality, relevant and accurate to the described subject, clean composition, no watermarks, minimal or no text in the image.`;
 }
 
 function getSupabaseAdmin() {
@@ -234,18 +274,35 @@ serve(async (req) => {
       });
     }
 
+    // Translate Arabic prompts to English for better image generation
+    let finalPrompt = prompt;
+    let finalContext = imageContext;
+    if (containsArabic(prompt)) {
+      finalPrompt = await translateToEnglish(prompt);
+    }
+    if (finalContext && containsArabic(finalContext)) {
+      finalContext = await translateToEnglish(finalContext);
+    }
+
+    if (!finalPrompt || finalPrompt === prompt) {
+      // Translation failed or returned same text, keep original
+      finalPrompt = prompt;
+    }
+
+    console.log(`[generate-image] Final prompt: "${finalPrompt}"`);
+
     let imageUrl: string | null = null;
     let usedModel = "unknown";
 
     if (geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt, preset, imageContext);
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, preset, finalContext);
       if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-user-pro" : "gemini-direct-user-flash";
     }
 
     if (!imageUrl) {
       const serverKey = Deno.env.get("GEMINI_API_KEY");
       if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, prompt, preset, imageContext);
+        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, preset, finalContext);
         if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-server-pro" : "gemini-direct-server-flash";
       }
     }
@@ -253,18 +310,18 @@ serve(async (req) => {
     if (!imageUrl) {
       const lovableKey = Deno.env.get("LOVABLE_API_KEY");
       if (lovableKey) {
-        imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset, imageContext);
+        imageUrl = await generateWithLovableGateway(lovableKey, finalPrompt, preset, finalContext);
         if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
       }
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(prompt, imageContext);
+      imageUrl = await generateWithCloudflare(finalPrompt, finalContext);
       if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(prompt, imageContext);
+      imageUrl = await generateWithPollinations(finalPrompt, finalContext);
       if (imageUrl) usedModel = "pollinations-free";
     }
 
