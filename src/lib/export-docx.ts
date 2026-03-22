@@ -3,7 +3,7 @@ import { saveAs } from 'file-saver';
 import type { ProjectData } from '@/pages/ProjectEditor';
 import type { Lang } from '@/i18n/translations';
 
-async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; type: 'png' | 'jpg' | 'jpeg' | 'gif' | 'bmp' } | null> {
+async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; type: 'png' | 'jpg' | 'gif' | 'bmp' } | null> {
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
