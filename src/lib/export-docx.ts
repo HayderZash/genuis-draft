@@ -9,7 +9,7 @@ async function fetchImageAsBuffer(url: string): Promise<{ buffer: ArrayBuffer; t
     if (!response.ok) return null;
     const buffer = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || '';
-    let type: 'png' | 'jpg' | 'jpeg' | 'gif' | 'bmp' = 'png';
+    let type: 'png' | 'jpg' | 'gif' | 'bmp' = 'png';
     if (contentType.includes('jpeg') || contentType.includes('jpg') || url.includes('.jpg') || url.includes('.jpeg')) {
       type = 'jpg';
     }
