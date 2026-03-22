@@ -88,4 +88,13 @@
     font-family: 'Times New Roman', Times, serif;
     text-align: justify;
   }
+
+  .generated-content .figure-caption,
+  .generated-content p.figure-caption {
+    font-style: italic;
+    text-align: center;
+    font-size: 12px;
+    color: hsl(var(--muted-foreground));
+    margin: 8px 0 16px 0;
+  }
 }

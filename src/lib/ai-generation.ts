@@ -292,7 +292,7 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 20);
 
   const chapterPages = project.chapter_pages?.[chapterIndex];
-  const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 1200;
+  const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 800;
   const chapterNum = chapterIndex + 1;
   const isLast = chapterIndex === project.chapters.length - 1;
   const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
