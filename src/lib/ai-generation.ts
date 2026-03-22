@@ -175,7 +175,9 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
 2. اشرح المكون بالتفصيل في 2-3 فقرات (وظيفته، أهميته، كيف يعمل).
 3. أضف عنوان صورة توضيحية أسفل الشرح بالتنسيق:
 <p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.X: وصف دقيق بالإنجليزية للمكون يوضح شكله أو واجهته أو مخطط عمله]</p>
-تأكد أن الوصف دقيق ومرتبط بالمكون المشروح.`
+4. اجعل نوع الصورة من الأنواع القابلة للتوليد بدقة: لقطة واقعية للمكون، عرض منتج نظيف، أو مخطط تقني بسيط وواضح.
+5. تجنب تماماً طلب خرائط، رسوم بيانية إحصائية، جداول، أو صور تحتاج نصوصاً كثيرة داخلها.
+تأكد أن الوصف دقيق ومرتبط بالمكون المشروح، وأن الصورة تعرض موضوعاً واحداً واضحاً فقط.`
         : `CRITICAL: This is the "Methodology" chapter of a graduation project. You MUST include a section titled "Project Components" that explains each component mentioned in the abstract:
 "${project.abstract}"
 For each component:
@@ -183,17 +185,25 @@ For each component:
 2. Explain the component in detail in 2-3 paragraphs (function, importance, how it works).
 3. Add a figure caption below the explanation in this format:
 <p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.X: A precise English description of the component showing its interface, diagram, or architecture]</p>
-Ensure descriptions are specific and related to the explained component.`)
+4. Use only image types that can be generated accurately: a realistic component/product view, a clean product render, or a simple technical diagram.
+5. Do NOT request maps, statistical charts, tables, or visuals that depend on heavy text inside the image.
+Ensure descriptions are specific, visually concrete, and related to the explained component, with one clear subject per image.`)
       : '';
 
     const figureInstruction = includeImages
       ? (researchLang === 'ar'
         ? `مهم جداً: يجب أن تضيف ما لا يقل عن 3 إلى 5 عناوين صور توضيحية في هذا الفصل، موزعة بين الفقرات (ليس في النهاية فقط). كل عنوان صورة يجب أن يكون بالتنسيق التالي بالضبط:
 <p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.1: وصف دقيق ومفصل بالإنجليزية لما يجب أن تُظهره الصورة]</p>
-يجب أن يكون الوصف دقيقاً وواقعياً ومرتبطاً مباشرة بالمحتوى المكتوب في الفقرة السابقة.`
+يجب أن يكون الوصف دقيقاً وواقعياً ومرتبطاً مباشرة بالمحتوى المكتوب في الفقرة السابقة.
+اختر فقط صوراً قابلة للتوليد بدقة مثل: جهاز، مكوّن، مشهد تطبيقي، لقطة قريبة لقطعة مهمة، أو مخطط تقني/تشغيلي بسيط ونظيف.
+تجنب تماماً طلب خرائط، bar charts، line charts، الجداول، والرسوم التي تحتاج نصوصاً داخلية كثيرة.
+كل صورة يجب أن تعرض موضوعاً رئيسياً واحداً واضحاً وبتركيب مرتب وحديث.`
         : `CRITICAL: You MUST include at least 3 to 5 figure captions in this chapter, distributed between paragraphs (NOT only at the end). Each figure caption MUST follow this exact format:
 <p class="figure-caption" style="font-style:italic;text-align:center;font-size:12pt;">[Figure ${chapterNum}.1: A specific, detailed description of exactly what the image should show]</p>
-Each description MUST be specific, realistic, and directly related to the preceding paragraph content.`)
+Each description MUST be specific, realistic, and directly related to the preceding paragraph content.
+Only request image types that can be generated accurately, such as a device, component, practical scene, close-up of an important part, or a simple clean technical/workflow diagram.
+Do NOT request maps, bar charts, line charts, tables, or visuals that depend on heavy readable text inside the image.
+Each image should have one clear main subject and a clean modern composition.`)
       : '';
 
     const tableInstruction = includeTables
