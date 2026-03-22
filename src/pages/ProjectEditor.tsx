@@ -151,11 +151,22 @@ const ProjectEditor = () => {
             
             if (data?.imageUrl) {
               console.log(`[ImageGen] Success! URL: ${data.imageUrl.substring(0, 80)}...`);
-              const imgHtml = `<div class="generated-figure" style="text-align:center;margin:16px 0;"><img src="${data.imageUrl}" alt="${description}" style="max-width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" /></div>`;
-              // Insert image ABOVE the caption in the correct chapter
+              const imgHtml = `<img src="${data.imageUrl}" alt="${description}" style="max-width:80%;display:block;margin:12px auto;border-radius:8px;" />`;
+              // Find and replace the caption text, inserting image before it
               for (const key of Object.keys(updatedContent)) {
                 if (updatedContent[key].includes(match[0])) {
-                  updatedContent[key] = updatedContent[key].replace(match[0], imgHtml + match[0]);
+                  // Find the <p> tag containing this figure caption and insert image before it
+                  const captionParagraphRegex = new RegExp(
+                    `(<p[^>]*>\\s*\\[Figure\\s+${match[1].replace('.', '\\.')}:[^\\]]+\\]\\s*</p>)`,
+                    'i'
+                  );
+                  const pMatch = updatedContent[key].match(captionParagraphRegex);
+                  if (pMatch) {
+                    updatedContent[key] = updatedContent[key].replace(pMatch[0], imgHtml + pMatch[0]);
+                  } else {
+                    // Fallback: insert before the raw text
+                    updatedContent[key] = updatedContent[key].replace(match[0], imgHtml + match[0]);
+                  }
                   break;
                 }
               }
