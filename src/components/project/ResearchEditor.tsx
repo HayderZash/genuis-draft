@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
+import Image from '@tiptap/extension-image';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { EditorToolbar } from './EditorToolbar';
 import type { ProjectData } from '@/pages/ProjectEditor';
