@@ -124,7 +124,7 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
   return null;
 }
 
-async function generateWithCloudflare(prompt: string): Promise<string | null> {
+async function generateWithCloudflare(prompt: string, context?: string): Promise<string | null> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
 
@@ -146,7 +146,7 @@ async function generateWithCloudflare(prompt: string): Promise<string | null> {
           Accept: "image/png,application/json",
         },
         body: JSON.stringify({
-          prompt: getPrompt(prompt),
+          prompt: getPrompt(prompt, context),
           num_steps: 20,
         }),
       });
