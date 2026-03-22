@@ -41,7 +41,7 @@ async function htmlToDocxParagraphs(html: string): Promise<Paragraph[]> {
   nodes.forEach(collectImages);
 
   // Fetch all images in parallel
-  const imageCache = new Map<string, { buffer: ArrayBuffer; type: 'png' | 'jpg' | 'jpeg' | 'gif' | 'bmp' }>();
+  const imageCache = new Map<string, { buffer: ArrayBuffer; type: 'png' | 'jpg' | 'gif' | 'bmp' }>();
   const results = await Promise.all(imageUrls.map(async (url) => {
     const result = await fetchImageAsBuffer(url);
     return { url, result };
