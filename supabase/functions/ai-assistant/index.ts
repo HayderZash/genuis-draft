@@ -187,13 +187,22 @@ async function fetchWikipediaSummary(query: string, language?: string): Promise<
     : `AI providers are temporarily unavailable, but here is a quick reference summary on the topic:\n\n${extract}`;
 }
 
-async function callPollinations(messages: ChatMessage[], language?: string): Promise<AssistantResult> {
+async function callCloudflare(messages: ChatMessage[], language?: string): Promise<AssistantResult> {
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+
+  if (!accountId || !apiToken) {
+    return { reply: null, error: "Cloudflare AI is not configured", status: 500 };
+  }
+
   try {
-    const response = await fetch("https://text.pollinations.ai/openai", {
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "openai",
         messages: [
           { role: "system", content: getSystemPrompt(language) },
           ...messages.map((m) => ({ role: m.role, content: m.content })),
@@ -205,16 +214,16 @@ async function callPollinations(messages: ChatMessage[], language?: string): Pro
 
     if (!response.ok) {
       const text = await response.text();
-      console.error("[ai-assistant] Pollinations error:", response.status, text);
-      return { reply: null, error: "Pollinations error", status: response.status };
+      console.error("[ai-assistant] Cloudflare error:", response.status, text);
+      return { reply: null, error: "Cloudflare AI error", status: response.status };
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim() || "";
-    return { reply: reply || null, error: reply ? null : "Empty Pollinations response", status: reply ? 200 : 502 };
+    const reply = data?.result?.response?.trim?.() || data?.response?.trim?.() || "";
+    return { reply: reply || null, error: reply ? null : "Empty Cloudflare response", status: reply ? 200 : 502 };
   } catch (e) {
-    console.error("[ai-assistant] Pollinations exception:", e);
-    return { reply: null, error: "Pollinations exception", status: 500 };
+    console.error("[ai-assistant] Cloudflare exception:", e);
+    return { reply: null, error: "Cloudflare AI exception", status: 500 };
   }
 }
 
@@ -257,7 +266,7 @@ serve(async (req) => {
     }
 
     if (!result.reply) {
-      result = await callPollinations(safeMessages, language);
+      result = await callCloudflare(safeMessages, language);
     }
 
     if (!result.reply) {
