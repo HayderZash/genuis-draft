@@ -19,8 +19,9 @@ const MODEL_MAP = {
 
 type ModelPreset = keyof typeof MODEL_MAP;
 
-function getPrompt(prompt: string) {
-  return `Generate one clean, professional academic illustration for: ${prompt}. Avoid text inside the image unless absolutely necessary.`;
+function getPrompt(prompt: string, context?: string) {
+  const contextPart = context ? ` for a research paper about "${context}"` : '';
+  return `Create a realistic, high-quality academic illustration${contextPart}. The image must clearly and accurately depict: ${prompt}. Requirements: photorealistic or detailed scientific diagram style, professional quality suitable for an academic paper, relevant and accurate to the described subject, clean composition, no watermarks, minimal or no text in the image.`;
 }
 
 function getSupabaseAdmin() {
@@ -54,7 +55,7 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   return uploadBytesToStorage(imageBytes, mimeType);
 }
 
-async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset): Promise<string | null> {
+async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gateway) {
     console.log(`[generate-image] Trying Lovable gateway: ${model}`);
     try {
@@ -66,7 +67,7 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
         },
         body: JSON.stringify({
           model,
-          messages: [{ role: "user", content: getPrompt(prompt) }],
+          messages: [{ role: "user", content: getPrompt(prompt, context) }],
           modalities: ["image", "text"],
         }),
       });
@@ -87,7 +88,7 @@ async function generateWithLovableGateway(apiKey: string, prompt: string, preset
   return null;
 }
 
-async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset): Promise<string | null> {
+async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gemini) {
     console.log(`[generate-image] Trying Gemini direct: ${model}`);
     try {
@@ -98,7 +99,7 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: getPrompt(prompt) }] }],
+          contents: [{ parts: [{ text: getPrompt(prompt, context) }] }],
           generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
         }),
       });
@@ -123,7 +124,7 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
   return null;
 }
 
-async function generateWithCloudflare(prompt: string): Promise<string | null> {
+async function generateWithCloudflare(prompt: string, context?: string): Promise<string | null> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
 
@@ -145,7 +146,7 @@ async function generateWithCloudflare(prompt: string): Promise<string | null> {
           Accept: "image/png,application/json",
         },
         body: JSON.stringify({
-          prompt: getPrompt(prompt),
+          prompt: getPrompt(prompt, context),
           num_steps: 20,
         }),
       });
@@ -184,11 +185,12 @@ async function generateWithCloudflare(prompt: string): Promise<string | null> {
   return null;
 }
 
-async function generateWithPollinations(prompt: string): Promise<string | null> {
+async function generateWithPollinations(prompt: string, context?: string): Promise<string | null> {
   console.log("[generate-image] Using Pollinations.ai (free)");
   try {
-    const shortPrompt = prompt.substring(0, 200);
-    const encodedPrompt = encodeURIComponent(`${shortPrompt}, professional, clean, academic style, illustration`);
+    const fullPrompt = context ? `${prompt}, related to ${context}` : prompt;
+    const shortPrompt = fullPrompt.substring(0, 200);
+    const encodedPrompt = encodeURIComponent(`${shortPrompt}, photorealistic, professional, academic research illustration, detailed, high quality`);
     const seed = Math.floor(Math.random() * 100000);
     const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&seed=${seed}`;
 
@@ -221,8 +223,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, geminiApiKey, model } = await req.json();
+    const { prompt, geminiApiKey, model, context } = await req.json();
     const preset: ModelPreset = model === "pro" ? "pro" : "standard";
+    const imageContext = context || "";
 
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Missing prompt" }), {
@@ -235,14 +238,14 @@ serve(async (req) => {
     let usedModel = "unknown";
 
     if (geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt, preset);
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, prompt, preset, imageContext);
       if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-user-pro" : "gemini-direct-user-flash";
     }
 
     if (!imageUrl) {
       const serverKey = Deno.env.get("GEMINI_API_KEY");
       if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, prompt, preset);
+        imageUrl = await generateWithGeminiDirect(serverKey, prompt, preset, imageContext);
         if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-server-pro" : "gemini-direct-server-flash";
       }
     }
@@ -250,18 +253,18 @@ serve(async (req) => {
     if (!imageUrl) {
       const lovableKey = Deno.env.get("LOVABLE_API_KEY");
       if (lovableKey) {
-        imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset);
+        imageUrl = await generateWithLovableGateway(lovableKey, prompt, preset, imageContext);
         if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
       }
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(prompt);
+      imageUrl = await generateWithCloudflare(prompt, imageContext);
       if (imageUrl) usedModel = "cloudflare-workers-ai";
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithPollinations(prompt);
+      imageUrl = await generateWithPollinations(prompt, imageContext);
       if (imageUrl) usedModel = "pollinations-free";
     }
 

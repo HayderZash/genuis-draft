@@ -167,13 +167,11 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
     const figureInstruction = includeImages
       ? (researchLang === 'ar'
         ? `مهم جداً: يجب أن تضيف ما لا يقل عن 3 إلى 5 عناوين صور توضيحية في هذا الفصل، موزعة بين الفقرات (ليس في النهاية فقط). كل عنوان صورة يجب أن يكون بالتنسيق التالي بالضبط:
-<p class="figure-caption">[Figure ${chapterNum}.1: وصف تفصيلي للصورة باللغة الإنجليزية]</p>
-<p class="figure-caption">[Figure ${chapterNum}.2: وصف تفصيلي آخر]</p>
-يجب أن يصف كل عنوان صورة عنصراً مرئياً مرتبطاً بالمحتوى مثل: مخطط، رسم بياني، صورة توضيحية، هيكل تنظيمي، خريطة مفاهيمية، إلخ. ضع عناوين الصور بين الفقرات وليس في نهاية الفصل.`
+<p class="figure-caption">[Figure ${chapterNum}.1: وصف دقيق ومفصل بالإنجليزية لما يجب أن تُظهره الصورة، مثل: A detailed cross-section diagram of a lithium-ion battery showing anode, cathode, and electrolyte layers]</p>
+يجب أن يكون الوصف دقيقاً وواقعياً ومرتبطاً مباشرة بالمحتوى المكتوب في الفقرة السابقة. لا تستخدم أوصافاً عامة أو مبهمة. اذكر بالضبط ما يجب أن يظهر في الصورة.`
         : `CRITICAL: You MUST include at least 3 to 5 figure captions in this chapter, distributed between paragraphs (NOT only at the end). Each figure caption MUST follow this exact format:
-<p class="figure-caption">[Figure ${chapterNum}.1: Detailed description of the image]</p>
-<p class="figure-caption">[Figure ${chapterNum}.2: Another detailed description]</p>
-Each caption must describe a visual element related to the content such as: diagram, chart, illustration, organizational structure, concept map, flowchart, etc. Place figure captions BETWEEN paragraphs, not at the end of the chapter.`)
+<p class="figure-caption">[Figure ${chapterNum}.1: A specific, detailed description of exactly what the image should show, e.g. "A bar chart comparing renewable energy adoption rates across European countries from 2020 to 2025"]</p>
+Each description MUST be specific, realistic, and directly related to the preceding paragraph content. Do NOT use vague descriptions like "illustration of the concept" - instead describe exactly what visual elements should appear.`)
       : '';
 
     const tableInstruction = includeTables
