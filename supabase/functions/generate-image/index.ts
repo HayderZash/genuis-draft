@@ -19,8 +19,9 @@ const MODEL_MAP = {
 
 type ModelPreset = keyof typeof MODEL_MAP;
 
-function getPrompt(prompt: string) {
-  return `Generate one clean, professional academic illustration for: ${prompt}. Avoid text inside the image unless absolutely necessary.`;
+function getPrompt(prompt: string, context?: string) {
+  const contextPart = context ? ` for a research paper about "${context}"` : '';
+  return `Create a realistic, high-quality academic illustration${contextPart}. The image must clearly and accurately depict: ${prompt}. Requirements: photorealistic or detailed scientific diagram style, professional quality suitable for an academic paper, relevant and accurate to the described subject, clean composition, no watermarks, minimal or no text in the image.`;
 }
 
 function getSupabaseAdmin() {
