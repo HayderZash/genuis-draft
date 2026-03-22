@@ -156,7 +156,7 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
     onProgress(progressStep, baseProgress);
 
     const chapterPages = project.chapter_pages?.[i];
-    const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 1200;
+    const wordTarget = chapterPages ? chapterPages * WORDS_PER_PAGE : 800;
     const chapterNum = i + 1;
     const isLast = i === totalChapters - 1;
     const refsInstruction = project.custom_references ? `\nUse these references where relevant: ${project.custom_references}` : '';
