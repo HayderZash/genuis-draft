@@ -130,33 +130,6 @@ function normalizePrompt(prompt: string): string {
 
 async function enhancePromptForRealism(prompt: string, context?: string): Promise<string> {
   const normalizedPrompt = normalizePrompt(prompt);
-  const normalizedContext = context ? normalizePrompt(context) : "";
-
-  const visualMode = detectVisualMode(normalizedPrompt, normalizedContext);
-
-  const rewriteSystemByMode: Record<VisualMode, string> = {
-    photo: "You rewrite prompts for photorealistic image generation. Preserve the exact subject and meaning. Make the wording more precise, realistic, visually grounded, and accurate. Do not add unrelated objects, architecture, symbolism, fantasy details, or art styles. Return only one concise English prompt.",
-    technical_diagram: "You rewrite prompts for clean, modern technical diagrams and engineering visuals. Preserve the exact subject and meaning. Make the wording precise, structured, and visually accurate. Prefer a neat academic or product-design presentation. Do not add unrelated objects, scenery, fantasy details, or decorative elements. Return only one concise English prompt.",
-    workflow_diagram: "You rewrite prompts for clean workflow and process diagrams. Preserve the exact process and subject. Make the wording structured, minimal, and visually clear. Avoid decorative scenery, fantasy elements, and unrelated objects. Return only one concise English prompt.",
-    map_infographic: "You rewrite prompts for clean academic map infographics. Preserve the exact geography and subject matter. Make the wording visually specific and organized. Avoid decorative scenery, fantasy elements, and unrelated icons. Do not ask for readable text inside the image. Return only one concise English prompt.",
-    chart_infographic: "You rewrite prompts for clean academic comparison charts and infographics. Preserve the exact compared entities and subject. Make the wording visually specific and organized. Avoid decorative objects, fantasy details, and unrelated scenery. Do not ask for readable text inside the image. Return only one concise English prompt.",
-    ui_mockup: "You rewrite prompts for clean, modern interface mockups. Preserve the exact interface purpose and subject. Make the wording precise and visually organized. Avoid decorative scenery, fantasy details, and unrelated objects. Return only one concise English prompt.",
-  };
-
-  try {
-    const enhanced = await runTextTask(
-      rewriteSystemByMode[visualMode],
-      `Main request: ${normalizedPrompt}${normalizedContext ? `\nContext: ${normalizedContext}` : ""}`,
-    );
-
-    if (enhanced) {
-      console.log(`[generate-image] Enhanced prompt: "${enhanced}"`);
-      return normalizePrompt(enhanced);
-    }
-  } catch (e) {
-    console.error("[generate-image] Prompt enhancement failed:", e);
-  }
-
   return normalizedPrompt;
 }
 
@@ -408,15 +381,14 @@ async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: 
   return null;
 }
 
-async function generateWithCloudflare(prompt: string, context?: string): Promise<string | null> {
+async function generateWithCloudflare(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
 
   if (!accountId || !apiToken) return null;
 
   const models = [
-    "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-    "@cf/bytedance/stable-diffusion-xl-lightning",
+    "@cf/black-forest-labs/flux-1-schnell",
   ];
 
   for (const model of models) {
@@ -430,10 +402,9 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
           Accept: "image/png,application/json",
         },
         body: JSON.stringify({
-          prompt: getPrompt(prompt, context),
-          negative_prompt: DEFAULT_NEGATIVE_PROMPT,
-          num_steps: model.includes("lightning") ? 8 : 28,
-          guidance: model.includes("lightning") ? 7.5 : 11,
+          prompt: getPrompt(prompt, context, visualMode),
+          steps: 8,
+          seed: Math.floor(Math.random() * 1000000),
           width: 1024,
           height: 768,
         }),
@@ -451,7 +422,12 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
         const data = await res.json();
         const base64 = data?.result?.image || data?.result?.base64 || data?.image;
         if (typeof base64 === "string" && base64.length > 100) {
-          return await uploadDataUrlToStorage(`data:image/png;base64,${base64}`);
+          const uploadedUrl = await uploadDataUrlToStorage(`data:image/png;base64,${base64}`);
+          if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
+            return uploadedUrl;
+          }
+          console.warn(`[generate-image] Rejected low-quality image from ${model}`);
+          continue;
         }
 
         console.error(`[generate-image] Cloudflare ${model}: no image payload in JSON response`);
@@ -464,7 +440,11 @@ async function generateWithCloudflare(prompt: string, context?: string): Promise
         continue;
       }
 
-      return await uploadBytesToStorage(bytes, contentType || "image/png");
+      const uploadedUrl = await uploadBytesToStorage(bytes, contentType || "image/png");
+      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
+        return uploadedUrl;
+      }
+      console.warn(`[generate-image] Rejected low-quality image from ${model}`);
     } catch (e) {
       console.error(`[generate-image] Cloudflare ${model} error:`, e);
     }
@@ -568,7 +548,12 @@ serve(async (req) => {
     }
 
     if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "High-quality image generation failed. Please retry in a moment." }), {
+      imageUrl = await generateWithCloudflare(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "cloudflare-flux";
+    }
+
+    if (!imageUrl) {
+      return new Response(JSON.stringify({ error: "High-quality image generation failed. The premium providers are temporarily unavailable or out of quota." }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
