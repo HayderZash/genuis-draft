@@ -326,8 +326,8 @@ Place them BETWEEN paragraphs, not at the end.`)
     : `Number: "Chapter ${chapterNum}: ${chapterName}" in <h1>, main ${chapterNum}.1 in <h2>, sub ${chapterNum}.1.1 in <h3>.`;
 
   const pageCountStrict = researchLang === 'ar'
-    ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). لا تكتب أقل.`
-    : `CRITICAL: This chapter MUST be exactly ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Do NOT write less.`;
+    ? `هام: يجب أن يكون طول هذا الفصل حوالي ${wordTarget} كلمة (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب بإيجاز وعمق دون تكرار.`
+    : `This chapter should be approximately ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write concisely without repetition.`;
 
   const systemPrompt = researchLang === 'ar'
     ? `أنت خبير أكاديمي. اكتب بأسلوب رسمي بالعربية. ${dirInstruction}
