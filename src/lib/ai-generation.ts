@@ -191,8 +191,8 @@ Each caption must describe a visual element related to the content such as: diag
       : `Number headings: chapter title "Chapter ${chapterNum}: ${chapterName}" in <h1>, main headings ${chapterNum}.1, ${chapterNum}.2 in <h2>, subheadings ${chapterNum}.1.1 in <h3>.`;
 
     const pageCountStrict = researchLang === 'ar'
-      ? `هام جداً: يجب أن يكون طول هذا الفصل ${wordTarget} كلمة بالضبط (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب محتوى كافياً لملء هذا العدد. لا تكتب أقل.`
-      : `CRITICAL: This chapter MUST be exactly ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write enough content to fill this count. Do NOT write less.`;
+      ? `هام: يجب أن يكون طول هذا الفصل حوالي ${wordTarget} كلمة (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} صفحات). اكتب بإيجاز وعمق دون تكرار. لا تعد صياغة نفس الأفكار.`
+      : `This chapter should be approximately ${wordTarget} words (${chapterPages || Math.round(wordTarget / WORDS_PER_PAGE)} pages). Write concisely and in-depth without repetition. Do NOT rephrase the same ideas.`;
 
     const systemPrompt = researchLang === 'ar'
       ? `أنت خبير أكاديمي متخصص. اكتب بأسلوب أكاديمي رسمي باللغة العربية. ${dirInstruction}
