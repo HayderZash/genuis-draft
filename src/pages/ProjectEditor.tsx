@@ -211,6 +211,26 @@ const ProjectEditor = () => {
             }
           } catch (e) {
             console.error('[ImageGen] Failed:', description, e);
+            // Insert upload placeholder on failure
+            const placeholderHtml = `<div style="border:2px dashed #999;border-radius:8px;padding:20px;text-align:center;margin:12px auto;max-width:80%;background:#f9f9f9;cursor:pointer;" class="image-upload-placeholder" data-figure="${figureNumber}" data-description="${description.replace(/"/g, '&quot;')}">
+              <p style="margin:0;color:#666;font-size:13px;">⚠️ ${isAr ? 'فشل توليد الصورة تلقائياً' : 'Auto-generation failed'}</p>
+              <p style="margin:4px 0 0;color:#999;font-size:12px;">${isAr ? 'استخدم زر رفع الصورة 📷 في شريط الأدوات لإدراج صورة يدوياً' : 'Use the 📷 upload button in the toolbar to insert an image manually'}</p>
+            </div>`;
+            for (const key of Object.keys(updatedContent)) {
+              if (updatedContent[key].includes(match[0])) {
+                const captionParagraphRegex = new RegExp(
+                  `(<p[^>]*>\\s*\\[Figure\\s+${match[1].replace('.', '\\.')}:[^\\]]+\\]\\s*</p>)`,
+                  'i'
+                );
+                const pMatch = updatedContent[key].match(captionParagraphRegex);
+                if (pMatch) {
+                  updatedContent[key] = updatedContent[key].replace(pMatch[0], placeholderHtml + pMatch[0]);
+                } else {
+                  updatedContent[key] = updatedContent[key].replace(match[0], placeholderHtml + match[0]);
+                }
+                break;
+              }
+            }
           }
 
           // Small delay between image generations
