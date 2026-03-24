@@ -478,8 +478,8 @@ Place them BETWEEN paragraphs, not at the end.`)
 
     const tableInstruction = includeTables
     ? (researchLang === 'ar'
-      ? `أضف جداول بيانات حقيقية بتنسيق HTML كامل مع <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. لا تكتب الجداول كنص عادي.`
-      : `Add real HTML tables with <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. NEVER write tables as plain text.`)
+      ? `قاعدة إلزامية: كل جدول يجب أن يكون عنصر <table> HTML حقيقي مع <thead> و <tbody>. ممنوع كتابة الجداول كنص. أضف 2-3 جداول بأرقام وبيانات حقيقية. كل جدول 3 أعمدة و4 صفوف على الأقل.`
+      : `MANDATORY: Every table MUST be a real HTML <table> element with <thead> and <tbody>. NEVER write tables as text. Add 2-3 tables with real data. Each table must have at least 3 columns and 4 rows.`)
     : '';
 
   const noRefsInChapter = researchLang === 'ar'
