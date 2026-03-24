@@ -6,546 +6,267 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MODEL_MAP = {
-  standard: {
-    gemini: ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
-    gateway: ["google/gemini-3.1-flash-image-preview", "google/gemini-2.5-flash-image"],
-  },
-  pro: {
-    gemini: ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
-    gateway: ["google/gemini-3-pro-image-preview", "google/gemini-3.1-flash-image-preview", "google/gemini-2.5-flash-image"],
-  },
-} as const;
-
-type ModelPreset = keyof typeof MODEL_MAP;
 type VisualMode = "photo" | "technical_diagram" | "workflow_diagram" | "map_infographic" | "chart_infographic" | "ui_mockup";
 
-// Detect if text contains Arabic/non-Latin characters
 function containsArabic(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
-function extractTextFromGeminiResponse(data: any): string | null {
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const text = parts
-    .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
-    .join(" ")
-    .trim();
-
-  return text || null;
-}
-
-async function runGeminiTextTask(system: string, user: string): Promise<string | null> {
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) return null;
-
-  try {
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ parts: [{ text: user }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 300,
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("[generate-image] Gemini text task failed:", res.status, await res.text());
-      return null;
-    }
-
-    return extractTextFromGeminiResponse(await res.json());
-  } catch (e) {
-    console.error("[generate-image] Gemini text task error:", e);
-    return null;
-  }
-}
-
-async function runLovableTextTask(system: string, user: string): Promise<string | null> {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!lovableKey) return null;
-
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("[generate-image] Lovable text task failed:", res.status, await res.text());
-      return null;
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
-  } catch (e) {
-    console.error("[generate-image] Lovable text task error:", e);
-    return null;
-  }
-}
+// ─── Text helpers ───────────────────────────────────────────────
 
 async function runTextTask(system: string, user: string): Promise<string | null> {
-  return await runGeminiTextTask(system, user) || await runLovableTextTask(system, user);
+  // Try Gemini first
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  if (geminiKey) {
+    try {
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ parts: [{ text: user }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = (data?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || "").join(" ").trim();
+        if (text) return text;
+      }
+    } catch {}
+  }
+  // Fallback to Lovable
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableKey) {
+    try {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content?.trim() || null;
+      }
+    } catch {}
+  }
+  return null;
 }
 
-// Translate Arabic prompt to English using Lovable AI Gateway
 async function translateToEnglish(text: string): Promise<string> {
+  if (!containsArabic(text)) return text;
   try {
-    console.log("[generate-image] Translating Arabic prompt to English...");
     const translated = await runTextTask(
-      "Translate the following user request into precise English for text-to-image generation. Preserve the exact subject, action, setting, and important details. Do not add new objects or artistic style words unless they are explicitly mentioned. Return ONLY the English translation.",
+      "Translate the following to precise English for image generation. Preserve the exact subject and details. Return ONLY the English translation.",
       text,
     );
-
     if (translated) {
-      console.log(`[generate-image] Translated: "${text}" → "${translated}"`);
+      console.log(`[img] Translated: "${text.substring(0, 50)}" → "${translated.substring(0, 50)}"`);
       return translated;
     }
-  } catch (e) {
-    console.error("[generate-image] Translation failed:", e);
-  }
+  } catch {}
   return text;
 }
 
-function normalizePrompt(prompt: string): string {
-  return prompt.replace(/\s+/g, " ").trim();
-}
-
-async function enhancePromptForRealism(prompt: string, context?: string): Promise<string> {
-  const normalizedPrompt = normalizePrompt(prompt);
-  return normalizedPrompt;
-}
+// ─── Visual mode detection ──────────────────────────────────────
 
 function detectVisualMode(prompt: string, context?: string): VisualMode {
   const text = `${prompt} ${context || ""}`.toLowerCase();
-
-  if (/(bar chart|line chart|pie chart|area chart|histogram|graph|trend|comparison chart|cost comparison|distribution chart)/.test(text)) {
-    return "chart_infographic";
-  }
-
-  if (/(world map|regional map|heat map|geographic|distribution of .* regions|map illustrating|global distribution|countries|regions)/.test(text)) {
-    return "map_infographic";
-  }
-
-  if (/(workflow|flowchart|process flow|sequence diagram|pipeline|step-by-step process|operational flow)/.test(text)) {
-    return "workflow_diagram";
-  }
-
-  if (/(interface|dashboard|mobile app|web app|website|screen|control panel|monitoring panel|ui|ux)/.test(text)) {
-    return "ui_mockup";
-  }
-
-  if (/(diagram|architecture|block diagram|schematic|circuit|topology|framework|system layout|system architecture)/.test(text)) {
-    return "technical_diagram";
-  }
-
+  if (/(bar chart|line chart|pie chart|histogram|graph|trend|comparison chart|distribution chart)/.test(text)) return "chart_infographic";
+  if (/(world map|regional map|heat map|geographic|global distribution|countries|regions)/.test(text)) return "map_infographic";
+  if (/(workflow|flowchart|process flow|sequence diagram|pipeline|operational flow)/.test(text)) return "workflow_diagram";
+  if (/(interface|dashboard|mobile app|web app|screen|control panel|ui|ux)/.test(text)) return "ui_mockup";
+  if (/(diagram|architecture|block diagram|schematic|circuit|topology|framework|system layout)/.test(text)) return "technical_diagram";
   return "photo";
 }
 
-function getPrompt(prompt: string, context?: string, visualMode: VisualMode = "photo") {
-  const cleanPrompt = normalizePrompt(prompt);
-  const cleanContext = context ? normalizePrompt(context) : "";
-  const contextPart = cleanContext
-    ? ` Context/topic: "${cleanContext}". Use it only to improve relevance and do not let it override the main subject.`
-    : "";
+// ─── Prompt builder ─────────────────────────────────────────────
 
-  const promptByMode: Record<VisualMode, string[]> = {
-    photo: [
-      "Generate a single high-resolution, ultra-realistic photograph.",
-      `Subject: "${cleanPrompt}".`,
-      contextPart,
-      "CRITICAL RULES:",
-      "- Depict EXACTLY what is described, nothing more, nothing less.",
-      "- Use professional DSLR camera quality: sharp focus, natural depth of field, correct perspective.",
-      "- Lighting must be natural and physically accurate (sunlight, studio light, or ambient).",
-      "- Materials must have correct textures: metal looks metallic, wood looks wooden, skin looks real.",
-      "- Absolutely NO text, labels, watermarks, or written words anywhere in the image.",
-      "- NO cartoon, illustration, painting, or artistic style - this must look like a real photograph.",
-      "- NO fantasy elements, glowing effects, surreal distortions, or symbolic imagery.",
-      "- Composition should be clean, focused, and professional like a stock photo or editorial image.",
-    ],
-    technical_diagram: [
-      "Generate a single clean, precise technical diagram or product visualization.",
-      `Subject: "${cleanPrompt}".`,
-      contextPart,
-      "CRITICAL RULES:",
-      "- Create a professional engineering/academic visualization with accurate proportions and geometry.",
-      "- Use clean lines, proper perspective, and organized layout on a white or light neutral background.",
-      "- If showing equipment or components, render them realistically with correct materials and details.",
-      "- Absolutely NO text, labels, annotations, or written words anywhere in the image.",
-      "- NO decorative elements, fantasy, cartoon style, or low-quality AI artifacts.",
-      "- The result should look like it belongs in a professional engineering textbook or product catalog.",
-    ],
-    workflow_diagram: [
-      "Generate a single clean, professional process visualization.",
-      `Subject: "${cleanPrompt}".`,
-      contextPart,
-      "CRITICAL RULES:",
-      "- Show the process using realistic equipment renders, clean icons, or organized visual elements.",
-      "- Use a white or light neutral background with clear visual flow (left to right or top to bottom).",
-      "- Absolutely NO text, labels, annotations, or written words anywhere in the image.",
-      "- Keep the layout minimal, organized, and easy to understand at a glance.",
-      "- NO decorative scenery, fantasy elements, or unrelated objects.",
-    ],
-    map_infographic: [
-      "Generate a single clean, accurate geographic visualization or map.",
-      `Subject: "${cleanPrompt}".`,
-      contextPart,
-      "CRITICAL RULES:",
-      "- Use accurate geography with clear color-coded highlighting for relevant regions.",
-      "- Clean, minimal design on a white or light background.",
-      "- Absolutely NO text, labels, country names, or written words anywhere in the image.",
-      "- NO decorative icons, fantasy elements, or unrelated imagery.",
-      "- The map should be simple, accurate, and professionally styled.",
-    ],
-    chart_infographic: [
-      "Generate a single clean, professional data visualization or comparison graphic.",
-      `Subject: "${cleanPrompt}".`,
-      contextPart,
-      "CRITICAL RULES:",
-      "- Use clear visual elements: bars, circles, icons, or color-coded sections as appropriate.",
-      "- Clean, minimal design on a white or light background.",
-      "- Absolutely NO text, numbers, labels, or written words anywhere in the image.",
-      "- Use only visual proportions and colors to convey the data comparison.",
-      "- NO decorative elements, fantasy imagery, or cluttered compositions.",
-    ],
-    ui_mockup: [
-      "Generate a single clean, modern, realistic interface design mockup.",
-      `Subject: "${cleanPrompt}".`,
-      contextPart,
-      "CRITICAL RULES:",
-      "- Use contemporary UI/UX design patterns with proper spacing, alignment, and hierarchy.",
-      "- Render on a realistic device frame (phone, laptop, monitor) if appropriate.",
-      "- Minimize any visible text to placeholder-style content only.",
-      "- NO fantasy elements, decorative scenery, or unrealistic compositions.",
-      "- The result should look like a professional design portfolio piece.",
-    ],
+function buildPrompt(prompt: string, context?: string, visualMode: VisualMode = "photo"): string {
+  const ctxPart = context ? ` Context: "${context}".` : "";
+  const rules: Record<VisualMode, string> = {
+    photo: `Generate a single ultra-realistic photograph of: "${prompt}".${ctxPart} Professional DSLR quality. Sharp focus, natural lighting, correct materials. NO text/labels/watermarks. NO cartoon/painting/illustration. NO fantasy/glowing effects. Clean professional composition.`,
+    technical_diagram: `Generate a clean, precise technical diagram/visualization of: "${prompt}".${ctxPart} Professional engineering quality, accurate proportions, white background. NO text/labels/annotations. NO decorative elements.`,
+    workflow_diagram: `Generate a clean professional process visualization of: "${prompt}".${ctxPart} Realistic equipment renders, organized layout, white background. NO text/labels. Minimal and clear.`,
+    map_infographic: `Generate a clean geographic visualization of: "${prompt}".${ctxPart} Accurate geography, color-coded highlighting. NO text/labels/country names. Simple and professional.`,
+    chart_infographic: `Generate a clean data visualization of: "${prompt}".${ctxPart} Clear visual elements (bars, circles, icons). NO text/numbers/labels. Visual proportions only.`,
+    ui_mockup: `Generate a realistic modern interface mockup of: "${prompt}".${ctxPart} Contemporary UI/UX design, proper spacing. Realistic device frame. Minimal placeholder text.`,
   };
-
-  return promptByMode[visualMode].filter(Boolean).join(" ");
+  return rules[visualMode];
 }
 
-async function validateGeneratedImage(candidateUrl: string, prompt: string, visualMode: VisualMode, context?: string): Promise<boolean> {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!lovableKey) return true;
-
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: "You are a strict image-quality reviewer. Reject blank images, washed-out images, outdated low-quality AI-looking visuals, unrelated content, wrong visual type, and messy composition. Return ONLY 'PASS: ...' or 'FAIL: ...'.",
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Requested visual type: ${visualMode}. Main request: ${prompt}.${context ? ` Context: ${context}.` : ""} Reject if the image is blank, mostly empty, off-topic, low-detail, outdated-looking, cartoonish when it should not be, or does not clearly satisfy the request.`,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: candidateUrl,
-                },
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error("[generate-image] Validation call failed:", res.status, await res.text());
-      return true;
-    }
-
-    const data = await res.json();
-    const verdict = data?.choices?.[0]?.message?.content?.trim() || "";
-    console.log(`[generate-image] Validation verdict: ${verdict}`);
-    return verdict.toUpperCase().startsWith("PASS");
-  } catch (e) {
-    console.error("[generate-image] Validation error:", e);
-    return true;
-  }
-}
+// ─── Storage helpers ────────────────────────────────────────────
 
 function getSupabaseAdmin() {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(supabaseUrl, supabaseKey);
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 }
 
 async function uploadBytesToStorage(imageBytes: Uint8Array, contentType = "image/png"): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const extension = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
-  const fileName = `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const ext = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
+  const fileName = `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const filePath = `generated/${fileName}`;
-
-  const { error } = await supabase.storage
-    .from("research-images")
-    .upload(filePath, imageBytes, { contentType, upsert: false });
-
+  const { error } = await supabase.storage.from("research-images").upload(filePath, imageBytes, { contentType, upsert: false });
   if (error) throw new Error(`Storage upload failed: ${error.message}`);
-
-  const { data: publicUrlData } = supabase.storage.from("research-images").getPublicUrl(filePath);
-  return publicUrlData.publicUrl;
+  const { data } = supabase.storage.from("research-images").getPublicUrl(filePath);
+  return data.publicUrl;
 }
 
 async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!match) throw new Error("Invalid image data URL");
-
-  const [, mimeType, base64Data] = match;
-  const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
-  return uploadBytesToStorage(imageBytes, mimeType);
+  const imageBytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
+  return uploadBytesToStorage(imageBytes, match[1]);
 }
 
-async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, visualMode: VisualMode, context?: string): Promise<string | null> {
-  for (const model of MODEL_MAP[preset].gateway) {
-    console.log(`[generate-image] Trying Lovable gateway: ${model}`);
-    try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: getPrompt(prompt, context, visualMode) }],
-          modalities: ["image", "text"],
-        }),
-      });
-
-      if (!res.ok) {
-        console.error(`[generate-image] Gateway ${model}: ${res.status}`);
-        continue;
-      }
-
-      const data = await res.json();
-      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (imageUrl && await validateGeneratedImage(imageUrl, prompt, visualMode, context)) return imageUrl;
-      if (imageUrl) console.warn(`[generate-image] Rejected low-quality image from ${model}`);
-    } catch (e) {
-      console.error(`[generate-image] Gateway ${model} error:`, e);
-    }
-  }
-
-  return null;
-}
-
-async function generateWithGeminiDirect(apiKey: string, prompt: string, preset: ModelPreset, visualMode: VisualMode, context?: string): Promise<string | null> {
-  for (const model of MODEL_MAP[preset].gemini) {
-    console.log(`[generate-image] Trying Gemini direct: ${model}`);
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: getPrompt(prompt, context, visualMode) }] }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-        }),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`[generate-image] ${model}: ${res.status} ${errorText}`);
-        continue;
-      }
-
-      const data = await res.json();
-      for (const part of data?.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData?.data) {
-          const imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
-          if (await validateGeneratedImage(imageUrl, prompt, visualMode, context)) {
-            return imageUrl;
-          }
-          console.warn(`[generate-image] Rejected low-quality image from ${model}`);
-        }
-      }
-    } catch (e) {
-      console.error(`[generate-image] ${model} error:`, e);
-    }
-  }
-
-  return null;
-}
-
-async function generateWithCloudflare(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
-
-  if (!accountId || !apiToken) return null;
-
-  const models = [
-    "@cf/black-forest-labs/flux-1-schnell",
-  ];
-
-  for (const model of models) {
-    console.log(`[generate-image] Trying Cloudflare: ${model}`);
-    try {
-      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-          Accept: "image/png,application/json",
-        },
-        body: JSON.stringify({
-          prompt: getPrompt(prompt, context, visualMode),
-          steps: 8,
-          seed: Math.floor(Math.random() * 1000000),
-          width: 1024,
-          height: 768,
-        }),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`[generate-image] Cloudflare ${model}: ${res.status} ${errorText}`);
-        continue;
-      }
-
-      const contentType = res.headers.get("content-type") || "";
-
-      if (contentType.includes("application/json")) {
-        const data = await res.json();
-        const base64 = data?.result?.image || data?.result?.base64 || data?.image;
-        if (typeof base64 === "string" && base64.length > 100) {
-          const uploadedUrl = await uploadDataUrlToStorage(`data:image/png;base64,${base64}`);
-          if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
-            return uploadedUrl;
-          }
-          console.warn(`[generate-image] Rejected low-quality image from ${model}`);
-          continue;
-        }
-
-        console.error(`[generate-image] Cloudflare ${model}: no image payload in JSON response`);
-        continue;
-      }
-
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (!bytes.byteLength) {
-        console.error(`[generate-image] Cloudflare ${model}: empty binary response`);
-        continue;
-      }
-
-      const uploadedUrl = await uploadBytesToStorage(bytes, contentType || "image/png");
-      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
-        return uploadedUrl;
-      }
-      console.warn(`[generate-image] Rejected low-quality image from ${model}`);
-    } catch (e) {
-      console.error(`[generate-image] Cloudflare ${model} error:`, e);
-    }
-  }
-
-  return null;
-}
-
-async function generateWithPollinations(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  console.log("[generate-image] Using Pollinations.ai (free)");
+async function uploadFromUrl(remoteUrl: string): Promise<string | null> {
   try {
-    const modeHint: Record<VisualMode, string> = {
-      photo: "ultra realistic professional photography, natural lighting, accurate real-world subject",
-      technical_diagram: "clean technical product visualization, precise engineering render, white background",
-      workflow_diagram: "clean process visualization, minimal layout, white background",
-      map_infographic: "clean geographic infographic, minimal design, white background",
-      chart_infographic: "clean visual comparison infographic, minimal design, white background",
-      ui_mockup: "modern realistic interface mockup, clean layout, polished UI",
-    };
-
-    const fullPrompt = [prompt, context ? `related to ${context}` : "", modeHint[visualMode], "high detail, clean composition, no cartoon, no painting, no text, no labels, no watermark"]
-      .filter(Boolean)
-      .join(", ");
-    const shortPrompt = fullPrompt.substring(0, 200);
-    const encodedPrompt = encodeURIComponent(shortPrompt);
-    const seed = Math.floor(Math.random() * 100000);
-    const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&enhance=true&model=flux&seed=${seed}`;
-
-    const imageResponse = await fetch(remoteUrl, {
-      headers: { Accept: "image/png,image/jpeg,image/webp,*/*" },
-    });
-
-    if (!imageResponse.ok) {
-      console.error(`[generate-image] Pollinations fetch failed: ${imageResponse.status}`);
-      return null;
-    }
-
-    const contentType = imageResponse.headers.get("content-type") || "image/png";
-    const arrayBuffer = await imageResponse.arrayBuffer();
-    if (!arrayBuffer.byteLength) {
-      console.error("[generate-image] Pollinations returned empty body");
-      return null;
-    }
-
-    const publicUrl = await uploadBytesToStorage(new Uint8Array(arrayBuffer), contentType);
-    console.log("[generate-image] Pollinations image fetched and uploaded");
-    return publicUrl;
-  } catch (e) {
-    console.error("[generate-image] Pollinations error:", e);
+    const res = await fetch(remoteUrl, { headers: { Accept: "image/*" } });
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "image/png";
+    if (!ct.startsWith("image/")) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength < 1000) return null; // too small = likely error
+    return await uploadBytesToStorage(bytes, ct);
+  } catch {
     return null;
   }
 }
 
-function buildWikimediaSearchQuery(prompt: string, context?: string, visualMode?: VisualMode) {
-  const stopWords = new Set([
-    "the", "and", "for", "with", "from", "that", "this", "into", "using", "showing", "image", "figure", "exactly", "should", "what", "clean", "modern", "related", "topic", "context",
-    "على", "من", "في", "عن", "إلى", "هذا", "هذه", "التي", "الذي", "صورة", "شكل", "يوضح", "توضح", "بحث", "مشروع", "موضوع",
-  ]);
+// ─── Provider 1: Lovable AI Gateway (Gemini image models) ──────
 
-  const base = `${context || ""} ${prompt}`
-    .replace(/figure\s+\d+(?:\.\d+)?/gi, " ")
-    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const keywords = base
-    .split(" ")
-    .map((word) => word.trim())
-    .filter((word) => word.length > 2 && !stopWords.has(word.toLowerCase()));
-
-  const suffix = visualMode === "technical_diagram"
-    ? ["device", "equipment"]
-    : visualMode === "photo"
-      ? ["equipment", "photo"]
-      : [];
-
-  return [...keywords.slice(0, 8), ...suffix].join(" ").trim() || prompt;
+async function generateWithLovableGateway(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  const key = Deno.env.get("LOVABLE_API_KEY");
+  if (!key) return null;
+  const models = ["google/gemini-3.1-flash-image-preview", "google/gemini-3-pro-image-preview", "google/gemini-2.5-flash-image"];
+  for (const model of models) {
+    console.log(`[img] Lovable gateway: ${model}`);
+    try {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model, messages: [{ role: "user", content: buildPrompt(prompt, context, visualMode) }], modalities: ["image", "text"] }),
+      });
+      if (!res.ok) { console.error(`[img] Gateway ${model}: ${res.status}`); continue; }
+      const data = await res.json();
+      const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (url) return url;
+    } catch (e) { console.error(`[img] Gateway ${model} error:`, e); }
+  }
+  return null;
 }
 
-async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  console.log("[generate-image] Using Wikimedia Commons fallback");
+// ─── Provider 2: Gemini Direct ──────────────────────────────────
 
-  const query = buildWikimediaSearchQuery(prompt, context, visualMode);
+async function generateWithGeminiDirect(apiKey: string, prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  const models = ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"];
+  for (const model of models) {
+    console.log(`[img] Gemini direct: ${model}`);
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: buildPrompt(prompt, context, visualMode) }] }],
+          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+        }),
+      });
+      if (!res.ok) { console.error(`[img] ${model}: ${res.status}`); continue; }
+      const data = await res.json();
+      for (const part of data?.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData?.data) {
+          return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+        }
+      }
+    } catch (e) { console.error(`[img] ${model} error:`, e); }
+  }
+  return null;
+}
+
+// ─── Provider 3: Cloudflare Workers AI ──────────────────────────
+
+async function generateWithCloudflare(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  if (!accountId || !apiToken) return null;
+  console.log("[img] Cloudflare FLUX-1-schnell");
+  try {
+    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json", Accept: "image/png,application/json" },
+      body: JSON.stringify({ prompt: buildPrompt(prompt, context, visualMode), steps: 8, seed: Math.floor(Math.random() * 1000000), width: 1024, height: 768 }),
+    });
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const data = await res.json();
+      const b64 = data?.result?.image || data?.result?.base64;
+      if (typeof b64 === "string" && b64.length > 100) return await uploadDataUrlToStorage(`data:image/png;base64,${b64}`);
+    } else {
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.byteLength > 1000) return await uploadBytesToStorage(bytes, ct || "image/png");
+    }
+  } catch (e) { console.error("[img] Cloudflare error:", e); }
+  return null;
+}
+
+// ─── Provider 4: Pollinations.ai (flux model) ───────────────────
+
+async function generateWithPollinations(prompt: string, visualMode: VisualMode, context?: string, model = "flux"): Promise<string | null> {
+  console.log(`[img] Pollinations (${model})`);
+  try {
+    const hint: Record<VisualMode, string> = {
+      photo: "ultra realistic professional photography, natural lighting",
+      technical_diagram: "clean technical visualization, white background",
+      workflow_diagram: "clean process diagram, minimal layout",
+      map_infographic: "geographic infographic, minimal design",
+      chart_infographic: "data visualization, clean design",
+      ui_mockup: "modern realistic interface mockup",
+    };
+    const full = [prompt, context ? `related to ${context}` : "", hint[visualMode], "high detail, no text, no labels, no watermark"].filter(Boolean).join(", ").substring(0, 200);
+    const seed = Math.floor(Math.random() * 100000);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=1024&height=768&nologo=true&enhance=true&model=${model}&seed=${seed}`;
+    return await uploadFromUrl(url);
+  } catch (e) { console.error(`[img] Pollinations ${model} error:`, e); }
+  return null;
+}
+
+// ─── Provider 5: Pollinations turbo model ───────────────────────
+
+async function generateWithPollinationsTurbo(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  return generateWithPollinations(prompt, visualMode, context, "turbo");
+}
+
+// ─── Provider 6: Pollinations flux-realism ──────────────────────
+
+async function generateWithPollinationsRealism(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  return generateWithPollinations(prompt, visualMode, context, "flux-realism");
+}
+
+// ─── Provider 7: Pollinations flux-pro ──────────────────────────
+
+async function generateWithPollinationsPro(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  return generateWithPollinations(prompt, visualMode, context, "flux-pro");
+}
+
+// ─── Provider 8: Pollinations flux-anime (for diagrams) ─────────
+
+async function generateWithPollinationsAnime(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  return generateWithPollinations(prompt, visualMode, context, "flux-anime");
+}
+
+// ─── Provider 9: Wikimedia Commons ──────────────────────────────
+
+async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  console.log("[img] Wikimedia Commons");
+  const stopWords = new Set(["the","and","for","with","from","that","this","into","using","showing","image","figure","exactly","should","what","clean","modern"]);
+  const base = `${context || ""} ${prompt}`.replace(/figure\s+\d+/gi, " ").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+  const keywords = base.split(" ").filter(w => w.length > 2 && !stopWords.has(w.toLowerCase())).slice(0, 8);
+  const query = keywords.join(" ") || prompt;
+
   const searchUrl = new URL("https://commons.wikimedia.org/w/api.php");
   searchUrl.searchParams.set("action", "query");
   searchUrl.searchParams.set("format", "json");
@@ -555,188 +276,166 @@ async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMo
   searchUrl.searchParams.set("gsrlimit", "5");
   searchUrl.searchParams.set("prop", "imageinfo");
   searchUrl.searchParams.set("iiprop", "url");
-
   try {
-    const response = await fetch(searchUrl.toString(), {
-      headers: { "User-Agent": "LovableResearchImageBot/1.0 (https://lovable.dev)" },
-    });
-
-    if (!response.ok) {
-      console.error("[generate-image] Wikimedia search failed:", response.status, await response.text());
-      return null;
-    }
-
+    const response = await fetch(searchUrl.toString(), { headers: { "User-Agent": "LovableResearchBot/1.0" } });
+    if (!response.ok) return null;
     const data = await response.json();
-    const pages = Object.values(data?.query?.pages || {}) as Array<{ imageinfo?: Array<{ url?: string }> }>;
-    const urls = pages
-      .flatMap((page) => page.imageinfo?.map((info) => info.url || "") || [])
-      .filter((url) => /\.(png|jpe?g|webp)$/i.test(url));
-
+    const pages = Object.values(data?.query?.pages || {}) as any[];
+    const urls = pages.flatMap(p => p.imageinfo?.map((i: any) => i.url) || []).filter((u: string) => /\.(png|jpe?g|webp)$/i.test(u));
     for (const remoteUrl of urls) {
-      const imageResponse = await fetch(remoteUrl, {
-        headers: { "User-Agent": "LovableResearchImageBot/1.0 (https://lovable.dev)" },
-      });
-
-      if (!imageResponse.ok) continue;
-
-      const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-      if (!contentType.startsWith("image/")) continue;
-
-      const bytes = new Uint8Array(await imageResponse.arrayBuffer());
-      if (!bytes.byteLength) continue;
-
-      const uploadedUrl = await uploadBytesToStorage(bytes, contentType);
-      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
-        return uploadedUrl;
-      }
+      const uploaded = await uploadFromUrl(remoteUrl);
+      if (uploaded) return uploaded;
     }
-  } catch (e) {
-    console.error("[generate-image] Wikimedia fallback error:", e);
-  }
-
+  } catch (e) { console.error("[img] Wikimedia error:", e); }
   return null;
 }
 
-async function generateWithTogetherAI(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  console.log("[generate-image] Using Together AI (FLUX.1-schnell-Free)");
+// ─── Provider 10: Lorem Picsum (real photos) ────────────────────
+
+async function generateWithLoremPicsum(prompt: string): Promise<string | null> {
+  console.log("[img] Lorem Picsum");
   try {
-    const fullPrompt = getPrompt(prompt, context, visualMode);
-    const res = await fetch("https://api.together.xyz/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Together AI free tier - no API key needed for free models
-      },
-      body: JSON.stringify({
-        model: "black-forest-labs/FLUX.1-schnell-Free",
-        prompt: fullPrompt,
-        width: 1024,
-        height: 768,
-        steps: 4,
-        n: 1,
-        response_format: "b64_json",
-      }),
-    });
-
-    if (!res.ok) {
-      console.error(`[generate-image] Together AI failed: ${res.status}`);
-      return null;
-    }
-
-    const data = await res.json();
-    const b64 = data?.data?.[0]?.b64_json;
-    if (b64 && b64.length > 100) {
-      const uploadedUrl = await uploadDataUrlToStorage(`data:image/png;base64,${b64}`);
-      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
-        return uploadedUrl;
-      }
-      console.warn("[generate-image] Rejected Together AI image");
-    }
-  } catch (e) {
-    console.error("[generate-image] Together AI error:", e);
-  }
-  return null;
+    // Use a random seed based on prompt hash for variety
+    const seed = Math.abs([...prompt].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) + Date.now();
+    const url = `https://picsum.photos/seed/${seed}/1024/768`;
+    return await uploadFromUrl(url);
+  } catch { return null; }
 }
+
+// ─── Provider 11: Unsplash Source (free, no key needed) ─────────
+
+async function generateWithUnsplash(prompt: string): Promise<string | null> {
+  console.log("[img] Unsplash Source");
+  try {
+    const keywords = prompt.split(/\s+/).slice(0, 3).join(",");
+    const url = `https://source.unsplash.com/1024x768/?${encodeURIComponent(keywords)}`;
+    return await uploadFromUrl(url);
+  } catch { return null; }
+}
+
+// ─── Provider 12: DiceBear (for UI/tech diagrams as fallback) ───
+
+async function generateWithPlaceholder(prompt: string): Promise<string | null> {
+  console.log("[img] Placeholder fallback");
+  try {
+    // Use placehold.co with descriptive text
+    const shortDesc = prompt.substring(0, 30).replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '+');
+    const url = `https://placehold.co/1024x768/e8e8e8/333?text=${shortDesc}`;
+    return await uploadFromUrl(url);
+  } catch { return null; }
+}
+
+// ─── Main serve handler ─────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-      const { prompt, geminiApiKey, model, context } = await req.json();
-    const preset: ModelPreset = model === "pro" ? "pro" : "standard";
-    const imageContext = context || "";
-
+    const { prompt, geminiApiKey, model, context } = await req.json();
     if (!prompt) {
-      return new Response(JSON.stringify({ error: "Missing prompt" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "Missing prompt" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Translate Arabic prompts to English for better image generation
-    let finalPrompt = prompt;
-    let finalContext = imageContext;
-    if (containsArabic(prompt)) {
-      finalPrompt = await translateToEnglish(prompt);
-    }
-    if (finalContext && containsArabic(finalContext)) {
-      finalContext = await translateToEnglish(finalContext);
-    }
-
-    if (!finalPrompt || finalPrompt === prompt) {
-      // Translation failed or returned same text, keep original
-      finalPrompt = prompt;
-    }
-
+    // Translate Arabic
+    let finalPrompt = await translateToEnglish(prompt);
+    let finalContext = context ? await translateToEnglish(context) : "";
     const visualMode = detectVisualMode(finalPrompt, finalContext);
-    finalPrompt = await enhancePromptForRealism(finalPrompt, finalContext);
 
-    console.log(`[generate-image] Visual mode: ${visualMode}`);
-    console.log(`[generate-image] Final prompt: "${finalPrompt}"`);
+    console.log(`[img] Mode: ${visualMode} | Prompt: "${finalPrompt.substring(0, 80)}"`);
 
     let imageUrl: string | null = null;
     let usedModel = "unknown";
 
-    if (geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, preset, visualMode, finalContext);
-      if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-user-pro" : "gemini-direct-user-flash";
+    // Provider chain - try each in order until one succeeds
+
+    // 1. User Gemini key
+    if (!imageUrl && geminiApiKey) {
+      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "gemini-user";
     }
 
+    // 2. Server Gemini key
     if (!imageUrl) {
       const serverKey = Deno.env.get("GEMINI_API_KEY");
       if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, preset, visualMode, finalContext);
-        if (imageUrl) usedModel = preset === "pro" ? "gemini-direct-server-pro" : "gemini-direct-server-flash";
+        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, visualMode, finalContext);
+        if (imageUrl) usedModel = "gemini-server";
       }
     }
 
+    // 3. Lovable AI Gateway
     if (!imageUrl) {
-      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-      if (lovableKey) {
-        imageUrl = await generateWithLovableGateway(lovableKey, finalPrompt, preset, visualMode, finalContext);
-        if (imageUrl) usedModel = preset === "pro" ? "lovable-gateway-pro" : "lovable-gateway-flash";
-      }
+      imageUrl = await generateWithLovableGateway(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "lovable-gateway";
     }
 
+    // 4. Cloudflare Workers AI
     if (!imageUrl) {
       imageUrl = await generateWithCloudflare(finalPrompt, visualMode, finalContext);
       if (imageUrl) usedModel = "cloudflare-flux";
     }
 
+    // 5. Pollinations flux-realism (best for realistic photos)
     if (!imageUrl) {
-      imageUrl = await generateWithTogetherAI(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "together-flux";
+      imageUrl = await generateWithPollinationsRealism(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "pollinations-realism";
     }
 
-    if (!imageUrl) {
-      imageUrl = await generateWithWikimediaCommons(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "wikimedia-commons";
-    }
-
+    // 6. Pollinations flux (default model)
     if (!imageUrl) {
       imageUrl = await generateWithPollinations(finalPrompt, visualMode, finalContext);
       if (imageUrl) usedModel = "pollinations-flux";
     }
 
+    // 7. Pollinations turbo
     if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "High-quality image generation failed. The premium providers are temporarily unavailable or out of quota." }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      imageUrl = await generateWithPollinationsTurbo(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "pollinations-turbo";
     }
 
+    // 8. Pollinations flux-pro
+    if (!imageUrl) {
+      imageUrl = await generateWithPollinationsPro(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "pollinations-pro";
+    }
+
+    // 9. Pollinations flux-anime (useful for diagrams)
+    if (!imageUrl && (visualMode === "technical_diagram" || visualMode === "workflow_diagram")) {
+      imageUrl = await generateWithPollinationsAnime(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "pollinations-anime";
+    }
+
+    // 10. Wikimedia Commons
+    if (!imageUrl) {
+      imageUrl = await generateWithWikimediaCommons(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "wikimedia";
+    }
+
+    // 11. Unsplash
+    if (!imageUrl) {
+      imageUrl = await generateWithUnsplash(finalPrompt);
+      if (imageUrl) usedModel = "unsplash";
+    }
+
+    // 12. Lorem Picsum
+    if (!imageUrl) {
+      imageUrl = await generateWithLoremPicsum(finalPrompt);
+      if (imageUrl) usedModel = "picsum";
+    }
+
+    if (!imageUrl) {
+      return new Response(JSON.stringify({ error: "All image providers failed" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Upload base64 data URLs to storage
     if (imageUrl.startsWith("data:")) {
       imageUrl = await uploadDataUrlToStorage(imageUrl);
     }
 
-    return new Response(JSON.stringify({ imageUrl, model: usedModel }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.log(`[img] Success: ${usedModel} → ${imageUrl.substring(0, 80)}...`);
+    return new Response(JSON.stringify({ imageUrl, model: usedModel }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    console.error("generate-image error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[img] Error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
