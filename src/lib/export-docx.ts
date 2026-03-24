@@ -329,12 +329,60 @@ function buildFrontMatter(project: ProjectData, fullHtml: string, isAr: boolean)
       spacing: { before: 400, after: 300 },
     }));
     if (figures.length > 0) {
-      figures.forEach((fig, i) => {
-        items.push(new Paragraph({
-          children: [new TextRun({ text: fig, font: 'Times New Roman', size: 24 })],
-          spacing: { after: 100 },
-        }));
-      });
+      const figRows = figures.map((fig) => 
+        new TableRow({
+          children: [
+            new TableCell({
+              borders: cellBorders,
+              width: { size: 2000, type: WidthType.DXA },
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              children: [new Paragraph({
+                children: [new TextRun({ text: fig.split(':')[0]?.trim() || '', font: 'Times New Roman', size: 24, bold: true })],
+                alignment: AlignmentType.CENTER,
+              })],
+            }),
+            new TableCell({
+              borders: cellBorders,
+              width: { size: 7360, type: WidthType.DXA },
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              children: [new Paragraph({
+                children: [new TextRun({ text: fig.split(':').slice(1).join(':').trim() || '', font: 'Times New Roman', size: 24 })],
+              })],
+            }),
+          ],
+        })
+      );
+      items.push(new Table({
+        width: { size: 9360, type: WidthType.DXA },
+        columnWidths: [2000, 7360],
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                borders: cellBorders,
+                width: { size: 2000, type: WidthType.DXA },
+                shading: { fill: 'D5E8F0', type: ShadingType.CLEAR },
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({
+                  children: [new TextRun({ text: isAr ? 'رقم الشكل' : 'Figure #', font: 'Times New Roman', size: 24, bold: true })],
+                  alignment: AlignmentType.CENTER,
+                })],
+              }),
+              new TableCell({
+                borders: cellBorders,
+                width: { size: 7360, type: WidthType.DXA },
+                shading: { fill: 'D5E8F0', type: ShadingType.CLEAR },
+                margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                children: [new Paragraph({
+                  children: [new TextRun({ text: isAr ? 'الوصف' : 'Description', font: 'Times New Roman', size: 24, bold: true })],
+                  alignment: AlignmentType.CENTER,
+                })],
+              }),
+            ],
+          }),
+          ...figRows,
+        ],
+      }));
     } else {
       items.push(new Paragraph({
         children: [new TextRun({ text: isAr ? 'لا توجد أشكال' : 'No figures found', font: 'Times New Roman', size: 24, italics: true })],
