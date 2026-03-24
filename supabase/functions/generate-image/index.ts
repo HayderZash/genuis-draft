@@ -12,10 +12,7 @@ function containsArabic(text: string): boolean {
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text);
 }
 
-// ─── Text helpers ───────────────────────────────────────────────
-
 async function runTextTask(system: string, user: string): Promise<string | null> {
-  // Try Gemini first
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (geminiKey) {
     try {
@@ -30,27 +27,20 @@ async function runTextTask(system: string, user: string): Promise<string | null>
       });
       if (res.ok) {
         const data = await res.json();
-        const text = (data?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || "").join(" ").trim();
-        if (text) return text;
+        const t = (data?.candidates?.[0]?.content?.parts || []).map((p: any) => p?.text || "").join(" ").trim();
+        if (t) return t;
       }
     } catch {}
   }
-  // Fallback to Lovable
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (lovableKey) {
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
-          messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        }),
+        body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content?.trim() || null;
-      }
+      if (res.ok) { const d = await res.json(); return d.choices?.[0]?.message?.content?.trim() || null; }
     } catch {}
   }
   return null;
@@ -59,387 +49,290 @@ async function runTextTask(system: string, user: string): Promise<string | null>
 async function translateToEnglish(text: string): Promise<string> {
   if (!containsArabic(text)) return text;
   try {
-    const translated = await runTextTask(
-      "Translate the following to precise English for image generation. Preserve the exact subject and details. Return ONLY the English translation.",
-      text,
-    );
-    if (translated) {
-      console.log(`[img] Translated: "${text.substring(0, 50)}" → "${translated.substring(0, 50)}"`);
-      return translated;
-    }
+    const r = await runTextTask("Translate to precise English for image generation. Return ONLY the translation.", text);
+    if (r) { console.log(`[img] Translated`); return r; }
   } catch {}
   return text;
 }
 
-// ─── Visual mode detection ──────────────────────────────────────
-
 function detectVisualMode(prompt: string, context?: string): VisualMode {
-  const text = `${prompt} ${context || ""}`.toLowerCase();
-  if (/(bar chart|line chart|pie chart|histogram|graph|trend|comparison chart|distribution chart)/.test(text)) return "chart_infographic";
-  if (/(world map|regional map|heat map|geographic|global distribution|countries|regions)/.test(text)) return "map_infographic";
-  if (/(workflow|flowchart|process flow|sequence diagram|pipeline|operational flow)/.test(text)) return "workflow_diagram";
-  if (/(interface|dashboard|mobile app|web app|screen|control panel|ui|ux)/.test(text)) return "ui_mockup";
-  if (/(diagram|architecture|block diagram|schematic|circuit|topology|framework|system layout)/.test(text)) return "technical_diagram";
+  const t = `${prompt} ${context || ""}`.toLowerCase();
+  if (/(bar chart|line chart|pie chart|histogram|graph|trend|comparison chart)/.test(t)) return "chart_infographic";
+  if (/(world map|regional map|heat map|geographic|global distribution)/.test(t)) return "map_infographic";
+  if (/(workflow|flowchart|process flow|sequence diagram|pipeline)/.test(t)) return "workflow_diagram";
+  if (/(interface|dashboard|mobile app|web app|screen|control panel|ui|ux)/.test(t)) return "ui_mockup";
+  if (/(diagram|architecture|block diagram|schematic|circuit|topology|framework)/.test(t)) return "technical_diagram";
   return "photo";
 }
 
-// ─── Prompt builder ─────────────────────────────────────────────
-
 function buildPrompt(prompt: string, context?: string, visualMode: VisualMode = "photo"): string {
-  const ctxPart = context ? ` Context: "${context}".` : "";
+  const ctx = context ? ` Context: "${context}".` : "";
   const rules: Record<VisualMode, string> = {
-    photo: `Generate a single ultra-realistic photograph of: "${prompt}".${ctxPart} Professional DSLR quality. Sharp focus, natural lighting, correct materials. NO text/labels/watermarks. NO cartoon/painting/illustration. NO fantasy/glowing effects. Clean professional composition.`,
-    technical_diagram: `Generate a clean, precise technical diagram/visualization of: "${prompt}".${ctxPart} Professional engineering quality, accurate proportions, white background. NO text/labels/annotations. NO decorative elements.`,
-    workflow_diagram: `Generate a clean professional process visualization of: "${prompt}".${ctxPart} Realistic equipment renders, organized layout, white background. NO text/labels. Minimal and clear.`,
-    map_infographic: `Generate a clean geographic visualization of: "${prompt}".${ctxPart} Accurate geography, color-coded highlighting. NO text/labels/country names. Simple and professional.`,
-    chart_infographic: `Generate a clean data visualization of: "${prompt}".${ctxPart} Clear visual elements (bars, circles, icons). NO text/numbers/labels. Visual proportions only.`,
-    ui_mockup: `Generate a realistic modern interface mockup of: "${prompt}".${ctxPart} Contemporary UI/UX design, proper spacing. Realistic device frame. Minimal placeholder text.`,
+    photo: `Generate a single ultra-realistic photograph of: "${prompt}".${ctx} Professional DSLR quality, sharp focus, natural lighting. NO text/labels/watermarks. NO cartoon/painting. Clean professional composition.`,
+    technical_diagram: `Generate a clean precise technical diagram of: "${prompt}".${ctx} Professional engineering quality, white background. NO text/labels. NO decorative elements.`,
+    workflow_diagram: `Generate a clean process visualization of: "${prompt}".${ctx} Organized layout, white background. NO text/labels.`,
+    map_infographic: `Generate a clean geographic visualization of: "${prompt}".${ctx} Color-coded highlighting. NO text/labels.`,
+    chart_infographic: `Generate a clean data visualization of: "${prompt}".${ctx} Visual proportions only. NO text/numbers.`,
+    ui_mockup: `Generate a realistic modern interface mockup of: "${prompt}".${ctx} Contemporary UI/UX design. Minimal text.`,
   };
   return rules[visualMode];
 }
 
-// ─── Storage helpers ────────────────────────────────────────────
+// ─── Storage ────────────────────────────────────────────────────
 
 function getSupabaseAdmin() {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 }
 
-async function uploadBytesToStorage(imageBytes: Uint8Array, contentType = "image/png"): Promise<string> {
+async function uploadBytes(bytes: Uint8Array, contentType = "image/png"): Promise<string> {
   const supabase = getSupabaseAdmin();
-  const ext = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
-  const fileName = `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const filePath = `generated/${fileName}`;
-  const { error } = await supabase.storage.from("research-images").upload(filePath, imageBytes, { contentType, upsert: false });
-  if (error) throw new Error(`Storage upload failed: ${error.message}`);
-  const { data } = supabase.storage.from("research-images").getPublicUrl(filePath);
-  return data.publicUrl;
+  const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
+  const path = `generated/img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from("research-images").upload(path, bytes, { contentType, upsert: false });
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+  return supabase.storage.from("research-images").getPublicUrl(path).data.publicUrl;
 }
 
-async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
-  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) throw new Error("Invalid image data URL");
-  const imageBytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
-  return uploadBytesToStorage(imageBytes, match[1]);
+async function uploadDataUrl(dataUrl: string): Promise<string> {
+  const m = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!m) throw new Error("Invalid data URL");
+  return uploadBytes(Uint8Array.from(atob(m[2]), c => c.charCodeAt(0)), m[1]);
 }
 
-async function uploadFromUrl(remoteUrl: string, timeout = 30000): Promise<string | null> {
+async function fetchAndUpload(url: string, timeout = 30000): Promise<string | null> {
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-    const res = await fetch(remoteUrl, { headers: { Accept: "image/*", "User-Agent": "LovableResearchBot/1.0" }, signal: controller.signal, redirect: "follow" });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeout);
+    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "LovableBot/1.0", Accept: "image/*" } });
     clearTimeout(timer);
-    if (!res.ok) return null;
-    const ct = res.headers.get("content-type") || "image/png";
-    if (!ct.startsWith("image/")) return null;
+    if (!res.ok) { console.error(`[img] fetch ${res.status} for ${url.substring(0, 80)}`); return null; }
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.startsWith("image/")) { console.error(`[img] Not image: ${ct}`); return null; }
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.byteLength < 1000) return null;
-    return await uploadBytesToStorage(bytes, ct);
-  } catch (e) {
-    console.error("[img] uploadFromUrl error:", e);
-    return null;
-  }
+    if (bytes.byteLength < 1000) { console.error(`[img] Too small: ${bytes.byteLength}`); return null; }
+    return await uploadBytes(bytes, ct);
+  } catch (e) { console.error(`[img] fetchAndUpload error:`, e); return null; }
 }
 
-// ─── Provider 1: Lovable AI Gateway (Gemini image models) ──────
+// ─── Provider 1: Gemini Direct ──────────────────────────────────
 
-async function generateWithLovableGateway(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+async function tryGeminiDirect(apiKey: string, prompt: string, vm: VisualMode, ctx?: string): Promise<string | null> {
+  for (const model of ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"]) {
+    console.log(`[img] Gemini: ${model}`);
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: buildPrompt(prompt, ctx, vm) }] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
+      });
+      if (!res.ok) { console.error(`[img] ${model}: ${res.status}`); continue; }
+      const data = await res.json();
+      for (const part of data?.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData?.data) return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+      }
+    } catch (e) { console.error(`[img] ${model}:`, e); }
+  }
+  return null;
+}
+
+// ─── Provider 2: Lovable AI Gateway ─────────────────────────────
+
+async function tryLovableGateway(prompt: string, vm: VisualMode, ctx?: string): Promise<string | null> {
   const key = Deno.env.get("LOVABLE_API_KEY");
   if (!key) return null;
-  const models = ["google/gemini-3.1-flash-image-preview", "google/gemini-3-pro-image-preview", "google/gemini-2.5-flash-image"];
-  for (const model of models) {
-    console.log(`[img] Lovable gateway: ${model}`);
+  for (const model of ["google/gemini-3.1-flash-image-preview", "google/gemini-3-pro-image-preview", "google/gemini-2.5-flash-image"]) {
+    console.log(`[img] Gateway: ${model}`);
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages: [{ role: "user", content: buildPrompt(prompt, context, visualMode) }], modalities: ["image", "text"] }),
+        body: JSON.stringify({ model, messages: [{ role: "user", content: buildPrompt(prompt, ctx, vm) }], modalities: ["image", "text"] }),
       });
       if (!res.ok) { console.error(`[img] Gateway ${model}: ${res.status}`); continue; }
       const data = await res.json();
       const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
       if (url) return url;
-    } catch (e) { console.error(`[img] Gateway ${model} error:`, e); }
-  }
-  return null;
-}
-
-// ─── Provider 2: Gemini Direct ──────────────────────────────────
-
-async function generateWithGeminiDirect(apiKey: string, prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  const models = ["gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"];
-  for (const model of models) {
-    console.log(`[img] Gemini direct: ${model}`);
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildPrompt(prompt, context, visualMode) }] }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-        }),
-      });
-      if (!res.ok) { console.error(`[img] ${model}: ${res.status}`); continue; }
-      const data = await res.json();
-      for (const part of data?.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData?.data) {
-          return `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
-        }
-      }
-    } catch (e) { console.error(`[img] ${model} error:`, e); }
+    } catch (e) { console.error(`[img] Gateway ${model}:`, e); }
   }
   return null;
 }
 
 // ─── Provider 3: Cloudflare Workers AI ──────────────────────────
 
-async function generateWithCloudflare(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+async function tryCloudflare(prompt: string, vm: VisualMode, ctx?: string): Promise<string | null> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
-  if (!accountId || !apiToken) return null;
-  console.log("[img] Cloudflare FLUX-1-schnell");
-  try {
-    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json", Accept: "image/png,application/json" },
-      body: JSON.stringify({ prompt: buildPrompt(prompt, context, visualMode), steps: 8, seed: Math.floor(Math.random() * 1000000), width: 1024, height: 768 }),
-    });
-    if (!res.ok) return null;
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-      const data = await res.json();
-      const b64 = data?.result?.image || data?.result?.base64;
-      if (typeof b64 === "string" && b64.length > 100) return await uploadDataUrlToStorage(`data:image/png;base64,${b64}`);
-    } else {
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.byteLength > 1000) return await uploadBytesToStorage(bytes, ct || "image/png");
-    }
-  } catch (e) { console.error("[img] Cloudflare error:", e); }
+  if (!accountId || !apiToken) { console.log("[img] No Cloudflare creds"); return null; }
+  
+  const models = ["@cf/black-forest-labs/flux-1-schnell", "@cf/stabilityai/stable-diffusion-xl-base-1.0"];
+  for (const model of models) {
+    console.log(`[img] Cloudflare: ${model}`);
+    try {
+      const body: any = { prompt: buildPrompt(prompt, ctx, vm) };
+      if (model.includes("flux")) {
+        body.steps = 8;
+        body.seed = Math.floor(Math.random() * 1000000);
+        body.width = 1024;
+        body.height = 768;
+      } else {
+        body.num_steps = 20;
+      }
+      
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      
+      if (!res.ok) { 
+        const errText = await res.text();
+        console.error(`[img] CF ${model}: ${res.status} ${errText.substring(0, 200)}`); 
+        continue; 
+      }
+      
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("image/")) {
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (bytes.byteLength > 1000) return await uploadBytes(bytes, ct);
+      } else {
+        const data = await res.json();
+        const b64 = data?.result?.image;
+        if (typeof b64 === "string" && b64.length > 100) {
+          return await uploadDataUrl(`data:image/png;base64,${b64}`);
+        }
+        console.error(`[img] CF ${model}: unexpected response`, JSON.stringify(data).substring(0, 200));
+      }
+    } catch (e) { console.error(`[img] CF ${model}:`, e); }
+  }
   return null;
 }
 
-// ─── Provider 4: Pollinations.ai (flux model) ───────────────────
+// ─── Provider 4-7: Pollinations.ai (multiple models) ────────────
 
-async function generateWithPollinations(prompt: string, visualMode: VisualMode, context?: string, model = "flux"): Promise<string | null> {
-  console.log(`[img] Pollinations (${model})`);
-  try {
-    const hint: Record<VisualMode, string> = {
-      photo: "ultra realistic professional photography, natural lighting",
-      technical_diagram: "clean technical visualization, white background",
-      workflow_diagram: "clean process diagram, minimal layout",
-      map_infographic: "geographic infographic, minimal design",
-      chart_infographic: "data visualization, clean design",
-      ui_mockup: "modern realistic interface mockup",
-    };
-    const full = [prompt, context ? `related to ${context}` : "", hint[visualMode], "high detail, no text, no labels, no watermark"].filter(Boolean).join(", ").substring(0, 200);
+async function tryPollinations(prompt: string, vm: VisualMode, ctx?: string): Promise<string | null> {
+  const hint: Record<VisualMode, string> = {
+    photo: "ultra realistic professional photo",
+    technical_diagram: "clean technical visualization, white background",
+    workflow_diagram: "clean process diagram",
+    map_infographic: "geographic infographic",
+    chart_infographic: "data visualization",
+    ui_mockup: "modern interface mockup",
+  };
+  
+  const models = ["flux", "turbo", "flux-realism", "flux-pro"];
+  const full = [prompt, ctx ? `related to ${ctx}` : "", hint[vm], "high detail, no text, no watermark"].filter(Boolean).join(", ").substring(0, 200);
+  
+  for (const model of models) {
+    console.log(`[img] Pollinations: ${model}`);
     const seed = Math.floor(Math.random() * 100000);
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=1024&height=768&nologo=true&enhance=true&model=${model}&seed=${seed}`;
-    return await uploadFromUrl(url);
-  } catch (e) { console.error(`[img] Pollinations ${model} error:`, e); }
+    const result = await fetchAndUpload(url, 25000);
+    if (result) return result;
+  }
   return null;
 }
 
-// ─── Provider 5: Pollinations turbo model ───────────────────────
+// ─── Provider 8: Wikimedia Commons ──────────────────────────────
 
-async function generateWithPollinationsTurbo(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  return generateWithPollinations(prompt, visualMode, context, "turbo");
-}
-
-// ─── Provider 6: Pollinations flux-realism ──────────────────────
-
-async function generateWithPollinationsRealism(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  return generateWithPollinations(prompt, visualMode, context, "flux-realism");
-}
-
-// ─── Provider 7: Pollinations flux-pro ──────────────────────────
-
-async function generateWithPollinationsPro(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  return generateWithPollinations(prompt, visualMode, context, "flux-pro");
-}
-
-// ─── Provider 8: Pollinations flux-anime (for diagrams) ─────────
-
-async function generateWithPollinationsAnime(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  return generateWithPollinations(prompt, visualMode, context, "flux-anime");
-}
-
-// ─── Provider 9: Wikimedia Commons ──────────────────────────────
-
-async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+async function tryWikimedia(prompt: string, ctx?: string): Promise<string | null> {
   console.log("[img] Wikimedia Commons");
-  const stopWords = new Set(["the","and","for","with","from","that","this","into","using","showing","image","figure","exactly","should","what","clean","modern"]);
-  const base = `${context || ""} ${prompt}`.replace(/figure\s+\d+/gi, " ").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
-  const keywords = base.split(" ").filter(w => w.length > 2 && !stopWords.has(w.toLowerCase())).slice(0, 8);
-  const query = keywords.join(" ") || prompt;
+  const stops = new Set(["the","and","for","with","from","that","this","into","using","showing","image","figure","clean","modern"]);
+  const base = `${ctx || ""} ${prompt}`.replace(/figure\s+\d+/gi, "").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+  const keywords = base.split(" ").filter(w => w.length > 2 && !stops.has(w.toLowerCase())).slice(0, 6);
+  const query = keywords.join(" ") || prompt.substring(0, 50);
 
-  const searchUrl = new URL("https://commons.wikimedia.org/w/api.php");
-  searchUrl.searchParams.set("action", "query");
-  searchUrl.searchParams.set("format", "json");
-  searchUrl.searchParams.set("generator", "search");
-  searchUrl.searchParams.set("gsrsearch", query);
-  searchUrl.searchParams.set("gsrnamespace", "6");
-  searchUrl.searchParams.set("gsrlimit", "5");
-  searchUrl.searchParams.set("prop", "imageinfo");
-  searchUrl.searchParams.set("iiprop", "url");
+  const u = new URL("https://commons.wikimedia.org/w/api.php");
+  u.searchParams.set("action", "query"); u.searchParams.set("format", "json");
+  u.searchParams.set("generator", "search"); u.searchParams.set("gsrsearch", query);
+  u.searchParams.set("gsrnamespace", "6"); u.searchParams.set("gsrlimit", "5");
+  u.searchParams.set("prop", "imageinfo"); u.searchParams.set("iiprop", "url");
+  
   try {
-    const response = await fetch(searchUrl.toString(), { headers: { "User-Agent": "LovableResearchBot/1.0" } });
-    if (!response.ok) return null;
-    const data = await response.json();
+    const res = await fetch(u.toString(), { headers: { "User-Agent": "LovableBot/1.0" } });
+    if (!res.ok) return null;
+    const data = await res.json();
     const pages = Object.values(data?.query?.pages || {}) as any[];
-    const urls = pages.flatMap(p => p.imageinfo?.map((i: any) => i.url) || []).filter((u: string) => /\.(png|jpe?g|webp)$/i.test(u));
-    for (const remoteUrl of urls) {
-      const uploaded = await uploadFromUrl(remoteUrl);
+    const urls = pages.flatMap(p => p.imageinfo?.map((i: any) => i.url) || []).filter((url: string) => /\.(png|jpe?g|webp)$/i.test(url));
+    for (const imgUrl of urls) {
+      const uploaded = await fetchAndUpload(imgUrl);
       if (uploaded) return uploaded;
     }
-  } catch (e) { console.error("[img] Wikimedia error:", e); }
+  } catch (e) { console.error("[img] Wikimedia:", e); }
   return null;
 }
 
-// ─── Provider 10: Lorem Picsum (real photos) ────────────────────
+// ─── Provider 9: Lorem Picsum ───────────────────────────────────
 
-async function generateWithLoremPicsum(prompt: string): Promise<string | null> {
-  console.log("[img] Lorem Picsum");
-  try {
-    // Use a random seed based on prompt hash for variety
-    const seed = Math.abs([...prompt].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) + Date.now();
-    const url = `https://picsum.photos/seed/${seed}/1024/768`;
-    return await uploadFromUrl(url);
-  } catch { return null; }
+async function tryPicsum(): Promise<string | null> {
+  console.log("[img] Picsum");
+  const seed = Date.now() % 1000;
+  return await fetchAndUpload(`https://picsum.photos/seed/${seed}/1024/768`);
 }
 
-// ─── Provider 11: Unsplash Source (free, no key needed) ─────────
+// ─── Provider 10: PlaceKitten / Placeholder ─────────────────────
 
-async function generateWithUnsplash(prompt: string): Promise<string | null> {
-  console.log("[img] Unsplash Source");
-  try {
-    const keywords = prompt.split(/\s+/).slice(0, 3).join(",");
-    const url = `https://source.unsplash.com/1024x768/?${encodeURIComponent(keywords)}`;
-    return await uploadFromUrl(url);
-  } catch { return null; }
+async function tryPlaceholder(): Promise<string | null> {
+  console.log("[img] Placeholder");
+  return await fetchAndUpload(`https://picsum.photos/seed/${Math.floor(Math.random() * 9999)}/1024/768`);
 }
 
-// ─── Provider 12: DiceBear (for UI/tech diagrams as fallback) ───
-
-async function generateWithPlaceholder(prompt: string): Promise<string | null> {
-  console.log("[img] Placeholder fallback");
-  try {
-    // Use placehold.co with descriptive text
-    const shortDesc = prompt.substring(0, 30).replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '+');
-    const url = `https://placehold.co/1024x768/e8e8e8/333?text=${shortDesc}`;
-    return await uploadFromUrl(url);
-  } catch { return null; }
-}
-
-// ─── Main serve handler ─────────────────────────────────────────
+// ─── Main ───────────────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { prompt, geminiApiKey, model, context } = await req.json();
-    if (!prompt) {
-      return new Response(JSON.stringify({ error: "Missing prompt" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    if (!prompt) return new Response(JSON.stringify({ error: "Missing prompt" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    // Translate Arabic
     let finalPrompt = await translateToEnglish(prompt);
     let finalContext = context ? await translateToEnglish(context) : "";
-    const visualMode = detectVisualMode(finalPrompt, finalContext);
-
-    console.log(`[img] Mode: ${visualMode} | Prompt: "${finalPrompt.substring(0, 80)}"`);
+    const vm = detectVisualMode(finalPrompt, finalContext);
+    console.log(`[img] Mode: ${vm} | "${finalPrompt.substring(0, 80)}"`);
 
     let imageUrl: string | null = null;
     let usedModel = "unknown";
 
-    // Provider chain - try each in order until one succeeds
-
     // 1. User Gemini key
-    if (!imageUrl && geminiApiKey) {
-      imageUrl = await generateWithGeminiDirect(geminiApiKey, finalPrompt, visualMode, finalContext);
+    if (geminiApiKey) {
+      imageUrl = await tryGeminiDirect(geminiApiKey, finalPrompt, vm, finalContext);
       if (imageUrl) usedModel = "gemini-user";
     }
 
     // 2. Server Gemini key
     if (!imageUrl) {
-      const serverKey = Deno.env.get("GEMINI_API_KEY");
-      if (serverKey) {
-        imageUrl = await generateWithGeminiDirect(serverKey, finalPrompt, visualMode, finalContext);
-        if (imageUrl) usedModel = "gemini-server";
-      }
+      const sk = Deno.env.get("GEMINI_API_KEY");
+      if (sk) { imageUrl = await tryGeminiDirect(sk, finalPrompt, vm, finalContext); if (imageUrl) usedModel = "gemini-server"; }
     }
 
-    // 3. Lovable AI Gateway
-    if (!imageUrl) {
-      imageUrl = await generateWithLovableGateway(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "lovable-gateway";
-    }
+    // 3. Lovable Gateway
+    if (!imageUrl) { imageUrl = await tryLovableGateway(finalPrompt, vm, finalContext); if (imageUrl) usedModel = "lovable-gateway"; }
 
-    // 4. Cloudflare Workers AI
-    if (!imageUrl) {
-      imageUrl = await generateWithCloudflare(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "cloudflare-flux";
-    }
+    // 4. Cloudflare Workers AI (2 models)
+    if (!imageUrl) { imageUrl = await tryCloudflare(finalPrompt, vm, finalContext); if (imageUrl) usedModel = "cloudflare"; }
 
-    // 5. Pollinations flux-realism (best for realistic photos)
-    if (!imageUrl) {
-      imageUrl = await generateWithPollinationsRealism(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "pollinations-realism";
-    }
+    // 5-8. Pollinations (4 models)
+    if (!imageUrl) { imageUrl = await tryPollinations(finalPrompt, vm, finalContext); if (imageUrl) usedModel = "pollinations"; }
 
-    // 6. Pollinations flux (default model)
-    if (!imageUrl) {
-      imageUrl = await generateWithPollinations(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "pollinations-flux";
-    }
+    // 9. Wikimedia Commons
+    if (!imageUrl) { imageUrl = await tryWikimedia(finalPrompt, finalContext); if (imageUrl) usedModel = "wikimedia"; }
 
-    // 7. Pollinations turbo
-    if (!imageUrl) {
-      imageUrl = await generateWithPollinationsTurbo(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "pollinations-turbo";
-    }
+    // 10. Picsum
+    if (!imageUrl) { imageUrl = await tryPicsum(); if (imageUrl) usedModel = "picsum"; }
 
-    // 8. Pollinations flux-pro
-    if (!imageUrl) {
-      imageUrl = await generateWithPollinationsPro(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "pollinations-pro";
-    }
-
-    // 9. Pollinations flux-anime (useful for diagrams)
-    if (!imageUrl && (visualMode === "technical_diagram" || visualMode === "workflow_diagram")) {
-      imageUrl = await generateWithPollinationsAnime(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "pollinations-anime";
-    }
-
-    // 10. Wikimedia Commons
-    if (!imageUrl) {
-      imageUrl = await generateWithWikimediaCommons(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "wikimedia";
-    }
-
-    // 11. Unsplash
-    if (!imageUrl) {
-      imageUrl = await generateWithUnsplash(finalPrompt);
-      if (imageUrl) usedModel = "unsplash";
-    }
-
-    // 12. Lorem Picsum
-    if (!imageUrl) {
-      imageUrl = await generateWithLoremPicsum(finalPrompt);
-      if (imageUrl) usedModel = "picsum";
-    }
+    // 11. Picsum fallback 2
+    if (!imageUrl) { imageUrl = await tryPlaceholder(); if (imageUrl) usedModel = "placeholder"; }
 
     if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "All image providers failed" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "All providers failed" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Upload base64 data URLs to storage
-    if (imageUrl.startsWith("data:")) {
-      imageUrl = await uploadDataUrlToStorage(imageUrl);
-    }
+    if (imageUrl.startsWith("data:")) imageUrl = await uploadDataUrl(imageUrl);
 
-    console.log(`[img] Success: ${usedModel} → ${imageUrl.substring(0, 80)}...`);
+    console.log(`[img] ✓ ${usedModel}`);
     return new Response(JSON.stringify({ imageUrl, model: usedModel }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("[img] Error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
