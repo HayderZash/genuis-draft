@@ -68,10 +68,37 @@ serve(async (req) => {
             content = gData.candidates?.[0]?.content?.parts?.[0]?.text || "";
             console.log("[ai-proxy] Gemini fallback success, length:", content.length);
           } else {
-            console.error("[ai-proxy] Gemini fallback also failed:", geminiResp.status);
-            return new Response(JSON.stringify({ error: `AI providers unavailable` }), {
-              status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            console.error("[ai-proxy] Gemini fallback failed:", geminiResp.status, "trying OpenRouter free");
+            // 3rd fallback: OpenRouter free models (no key needed for some)
+            try {
+              const orResp = await fetch("https://text.pollinations.ai/openai", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "openai",
+                  messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt },
+                  ],
+                  max_tokens: maxTokens || 4000,
+                }),
+              });
+              if (orResp.ok) {
+                const orData = await orResp.json();
+                content = orData.choices?.[0]?.message?.content || "";
+                console.log("[ai-proxy] Pollinations fallback success, length:", content.length);
+              } else {
+                console.error("[ai-proxy] All fallbacks failed");
+                return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Please try again in a few minutes." }), {
+                  status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+              }
+            } catch (e3) {
+              console.error("[ai-proxy] Pollinations error:", e3);
+              return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable." }), {
+                status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
           }
         } else {
           return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
