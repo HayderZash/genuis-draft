@@ -357,10 +357,10 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
 Place them BETWEEN paragraphs, not at the end.`)
     : '';
 
-  const tableInstruction = includeTables
+    const tableInstruction = includeTables
     ? (researchLang === 'ar'
-      ? `أضف جداول بيانات بتنسيق HTML مع عنوان <p><strong>جدول ${chapterNum}.X: الوصف</strong></p> متبوعاً بـ <table>.`
-      : `Add data tables with <p><strong>Table ${chapterNum}.X: Description</strong></p> followed by <table>.`)
+      ? `أضف جداول بيانات حقيقية بتنسيق HTML كامل مع <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. لا تكتب الجداول كنص عادي.`
+      : `Add real HTML tables with <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. NEVER write tables as plain text.`)
     : '';
 
   const noRefsInChapter = researchLang === 'ar'
