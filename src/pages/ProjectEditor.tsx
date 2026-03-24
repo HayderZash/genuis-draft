@@ -174,6 +174,16 @@ const ProjectEditor = () => {
             }
             
             if (data?.imageUrl) {
+              // Skip if we got a duplicate URL (same image returned twice)
+              if (generatedUrls.has(data.imageUrl)) {
+                console.warn(`[ImageGen] Duplicate image URL detected for "${description}", retrying...`);
+                // Retry once with slightly modified prompt
+                const retryResult = await supabase.functions.invoke('generate-image', { body: { prompt: `${description} - unique view ${m + 1}`, context: uniqueContext, model: project.image_quality === 'high' ? 'pro' : 'standard', geminiApiKey: geminiKey } });
+                if (retryResult.data?.imageUrl && !generatedUrls.has(retryResult.data.imageUrl)) {
+                  data.imageUrl = retryResult.data.imageUrl;
+                }
+              }
+              generatedUrls.add(data.imageUrl);
               console.log(`[ImageGen] Success! URL: ${data.imageUrl.substring(0, 80)}...`);
               const imgHtml = `<img src="${data.imageUrl}" alt="${description}" style="max-width:80%;display:block;margin:12px auto;border-radius:8px;" />`;
               // Find and replace the caption text, inserting image before it
