@@ -306,6 +306,11 @@ const ProjectEditor = () => {
           <GenerationProgress step={generationState.step} progress={generationState.progress} phase={generationState.phase} />
         )}
 
+        {/* Quality Indicator */}
+        {!generationState.active && project.status === 'completed' && (
+          <ContentQualityIndicator project={project} />
+        )}
+
         {/* Editor */}
         <div className="flex-1 overflow-y-auto">
           <ResearchEditor project={project} onContentChange={(content) => saveProject({ content })} />
