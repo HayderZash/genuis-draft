@@ -133,20 +133,40 @@ const ProjectEditor = () => {
         setGenerationState({ active: true, step: isAr ? `🎨 بدء توليد ${matches.length} صورة...` : `🎨 Starting generation of ${matches.length} images...`, progress: 0, phase: 'images' });
 
         const updatedContent = { ...content };
-        // Remove _full key so editor rebuilds from structured content with images
         delete updatedContent._full;
         let successCount = 0;
+        
+        // Build a map of which chapter each figure belongs to for unique context
+        const figureChapterMap = new Map<string, string>();
+        for (const key of Object.keys(content)) {
+          const chapterMatches = [...(content[key] || '').matchAll(/\[Figure\s+([\d.]+):\s*([^\]]+)\]/gi)];
+          for (const cm of chapterMatches) {
+            figureChapterMap.set(cm[0], key);
+          }
+        }
+        
+        // Track generated URLs to prevent duplicates
+        const generatedUrls = new Set<string>();
         
         for (let m = 0; m < matches.length; m++) {
           const match = matches[m];
           const description = match[2].trim();
+          const figureNumber = match[1];
           const progress = ((m + 1) / matches.length) * 100;
           setGenerationState({ active: true, step: isAr ? `🎨 توليد صورة (${m + 1}/${matches.length}): ${description.substring(0, 50)}...` : `🎨 (${m + 1}/${matches.length}) ${description.substring(0, 50)}...`, progress, phase: 'images' });
 
+          // Build unique context: project title + chapter name + figure number
+          const chapterKey = figureChapterMap.get(match[0]) || '';
+          const chapterIdx = chapterKey.startsWith('chapter_') ? parseInt(chapterKey.replace('chapter_', '')) : -1;
+          const chapterName = chapterIdx >= 0 && project.chapters[chapterIdx] 
+            ? (project.research_language === 'ar' ? project.chapters[chapterIdx].nameAr : project.chapters[chapterIdx].name)
+            : '';
+          const uniqueContext = `${project.title} - ${chapterName} - Figure ${figureNumber}`.trim();
+
           try {
-            console.log(`[ImageGen] Generating image ${m + 1}/${matches.length}: ${description}`);
+            console.log(`[ImageGen] Generating image ${m + 1}/${matches.length}: ${description} (context: ${uniqueContext})`);
             const geminiKey = localStorage.getItem('gemini_api_key') || '';
-            const { data, error } = await supabase.functions.invoke('generate-image', { body: { prompt: description, context: project.title, model: project.image_quality === 'high' ? 'pro' : 'standard', geminiApiKey: geminiKey } });
+            const { data, error } = await supabase.functions.invoke('generate-image', { body: { prompt: description, context: uniqueContext, model: project.image_quality === 'high' ? 'pro' : 'standard', geminiApiKey: geminiKey } });
             
             if (error) {
               console.error(`[ImageGen] Edge function error for "${description}":`, error);

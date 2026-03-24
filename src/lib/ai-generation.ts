@@ -231,22 +231,28 @@ Each image should have one clear main subject and a clean modern composition.`)
 
     const tableInstruction = includeTables
       ? (researchLang === 'ar'
-        ? `مهم جداً: يجب أن تضيف جداول بيانات حقيقية بتنسيق HTML كامل. كل جدول يجب أن يكون بالتنسيق التالي بالضبط:
-<p><strong>جدول ${chapterNum}.X: وصف الجدول</strong></p>
-<table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
-<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">العمود 1</th><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">العمود 2</th></tr></thead>
-<tbody><tr><td style="border:1px solid #000;padding:8px;">القيمة</td><td style="border:1px solid #000;padding:8px;">القيمة</td></tr></tbody>
+        ? `قاعدة إلزامية للجداول - لا يمكن تجاوزها:
+كل جدول في هذا الفصل يجب أن يكون عنصر <table> HTML حقيقي. ممنوع منعاً باتاً كتابة الجداول كنص عادي أو استخدام مسافات أو أعمدة نصية.
+النموذج الإلزامي الوحيد المقبول:
+<p style="text-align:center;"><strong>جدول ${chapterNum}.X: وصف الجدول</strong></p>
+<table border="1" style="border-collapse:collapse;width:100%;text-align:center;margin:10px auto;">
+<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">رأس العمود</th></tr></thead>
+<tbody><tr><td style="border:1px solid #000;padding:8px;">القيمة الفعلية</td></tr></tbody>
 </table>
-لا تكتب الجداول كنصوص عادية أبداً. يجب أن تكون عناصر <table> حقيقية مع <thead> و <tbody> و <tr> و <th> و <td>.
-أضف 2-3 جداول بيانات في هذا الفصل موزعة بين الفقرات.`
-        : `CRITICAL: You MUST add real HTML data tables. Each table MUST follow this exact format:
-<p><strong>Table ${chapterNum}.X: Table Description</strong></p>
-<table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
-<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column 1</th><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column 2</th></tr></thead>
-<tbody><tr><td style="border:1px solid #000;padding:8px;">Value</td><td style="border:1px solid #000;padding:8px;">Value</td></tr></tbody>
+يجب أن يحتوي كل جدول على بيانات حقيقية ومحددة (أرقام، قياسات، مواصفات) وليس بيانات عامة.
+أضف 2-3 جداول موزعة بين الفقرات. كل جدول يجب أن يحتوي 3 أعمدة على الأقل و4 صفوف على الأقل.
+تذكر: أي جدول ليس عنصر <table> HTML سيتم رفضه تلقائياً.`
+        : `MANDATORY TABLE RULE - Cannot be bypassed:
+Every table in this chapter MUST be a real HTML <table> element. Writing tables as plain text, using spaces, or text columns is STRICTLY FORBIDDEN.
+The ONLY acceptable format:
+<p style="text-align:center;"><strong>Table ${chapterNum}.X: Table Description</strong></p>
+<table border="1" style="border-collapse:collapse;width:100%;text-align:center;margin:10px auto;">
+<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column Header</th></tr></thead>
+<tbody><tr><td style="border:1px solid #000;padding:8px;">Actual Value</td></tr></tbody>
 </table>
-NEVER write tables as plain text. They MUST be actual <table> elements with <thead>, <tbody>, <tr>, <th>, <td>.
-Add 2-3 data tables distributed between paragraphs in this chapter.`)
+Each table MUST contain real, specific data (numbers, measurements, specifications) - NOT generic placeholder data.
+Add 2-3 tables distributed between paragraphs. Each table must have at least 3 columns and 4 rows.
+REMEMBER: Any table that is NOT an HTML <table> element will be automatically rejected.`)
       : '';
 
     const noRefsInChapter = researchLang === 'ar'
