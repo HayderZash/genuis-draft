@@ -93,10 +93,17 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
         }
         .research-editor img { max-width: 80%; border-radius: 8px; margin: 12px auto; display: block; }
         .research-editor .generated-figure { text-align: center; margin: 16px 0; }
+        .research-editor table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+        .research-editor table th, .research-editor table td { border: 1px solid #333; padding: 8px 12px; text-align: center; }
+        .research-editor table th { background: #e8e8e8; font-weight: bold; }
+        .research-editor table thead th { background: #d5e8f0; }
         .research-editor { font-family: "Times New Roman", Times, serif; }
         .ProseMirror { min-height: 60vh; }
         .ProseMirror:focus { outline: none; }
         .ProseMirror img { max-width: 80%; border-radius: 8px; margin: 12px auto; display: block; }
+        .ProseMirror table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        .ProseMirror table th, .ProseMirror table td { border: 1px solid #333; padding: 8px 12px; text-align: center; }
+        .ProseMirror table th { background: #d5e8f0; font-weight: bold; }
       `}</style>
       <EditorToolbar editor={editor} />
       <EditorContent editor={editor} />
