@@ -88,7 +88,7 @@ serve(async (req) => {
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt },
                       ],
-                      max_tokens: Math.min(maxTokens || 4000, 4000),
+                      max_tokens: maxTokens || 8000,
                       temperature: temperature ?? 0.7,
                     }),
                   }
