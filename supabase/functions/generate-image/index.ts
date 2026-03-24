@@ -138,9 +138,6 @@ async function uploadFromUrl(remoteUrl: string, timeout = 30000): Promise<string
     console.error("[img] uploadFromUrl error:", e);
     return null;
   }
-  } catch {
-    return null;
-  }
 }
 
 // ─── Provider 1: Lovable AI Gateway (Gemini image models) ──────
