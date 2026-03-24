@@ -47,23 +47,42 @@ serve(async (req) => {
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         console.error("Lovable AI error:", response.status, errText);
-        if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded (429)" }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        // Fallback to Gemini API on 402/429
+        const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
+        if (GEMINI_KEY && (response.status === 402 || response.status === 429)) {
+          console.log("[ai-proxy] Lovable failed, falling back to Gemini API");
+          const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+          const geminiResp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: combinedPrompt }] }],
+                generationConfig: { maxOutputTokens: maxTokens || 8000, temperature: temperature ?? 0.7 },
+              }),
+            }
+          );
+          if (geminiResp.ok) {
+            const gData = await geminiResp.json();
+            content = gData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            console.log("[ai-proxy] Gemini fallback success, length:", content.length);
+          } else {
+            console.error("[ai-proxy] Gemini fallback also failed:", geminiResp.status);
+            return new Response(JSON.stringify({ error: `AI providers unavailable` }), {
+              status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } else {
+          return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (response.status === 402) {
-          return new Response(JSON.stringify({ error: "Payment required (402)" }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ error: `AI error: ${response.status} - ${errText.substring(0, 200)}` }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      } else {
+        const data = await response.json();
+        content = data.choices?.[0]?.message?.content || "";
+        console.log("[ai-proxy] Lovable AI success, content length:", content.length);
       }
-      const data = await response.json();
-      content = data.choices?.[0]?.message?.content || "";
-      console.log("[ai-proxy] Lovable AI success, content length:", content.length);
 
     } else if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
