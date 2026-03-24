@@ -43,8 +43,8 @@ export const ContentQualityIndicator = ({ project }: Props) => {
             <span className="truncate max-w-[160px]">{s.name}</span>
             <div className="flex items-center gap-3 text-muted-foreground">
               <span>{s.wordCount} {lang === 'ar' ? 'ك' : 'w'}</span>
-              {s.imgCount > 0 && <span className="text-green-600">🖼 {s.imgCount}</span>}
-              {s.tableCount > 0 && <span className="text-blue-600">📊 {s.tableCount}</span>}
+              {s.imgCount > 0 && <span className="text-primary">🖼 {s.imgCount}</span>}
+              {s.tableCount > 0 && <span className="text-accent-foreground">📊 {s.tableCount}</span>}
             </div>
           </div>
         ))}

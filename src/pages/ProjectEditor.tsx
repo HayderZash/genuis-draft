@@ -14,6 +14,7 @@ import { exportToDocx } from '@/lib/export-docx';
 import type { AIProvider } from '@/components/SettingsDialog';
 import { PROVIDER_KEY_MAP, getMergeConfig, getProviderKey } from '@/components/SettingsDialog';
 import { ArrowLeft, PanelLeftClose, PanelLeft, Download, Settings2 } from 'lucide-react';
+import { ContentQualityIndicator } from '@/components/project/ContentQualityIndicator';
 
 export interface ProjectData {
   id: string;
