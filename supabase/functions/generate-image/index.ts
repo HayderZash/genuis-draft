@@ -122,15 +122,22 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   return uploadBytesToStorage(imageBytes, match[1]);
 }
 
-async function uploadFromUrl(remoteUrl: string): Promise<string | null> {
+async function uploadFromUrl(remoteUrl: string, timeout = 30000): Promise<string | null> {
   try {
-    const res = await fetch(remoteUrl, { headers: { Accept: "image/*" } });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    const res = await fetch(remoteUrl, { headers: { Accept: "image/*", "User-Agent": "LovableResearchBot/1.0" }, signal: controller.signal, redirect: "follow" });
+    clearTimeout(timer);
     if (!res.ok) return null;
     const ct = res.headers.get("content-type") || "image/png";
     if (!ct.startsWith("image/")) return null;
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.byteLength < 1000) return null; // too small = likely error
+    if (bytes.byteLength < 1000) return null;
     return await uploadBytesToStorage(bytes, ct);
+  } catch (e) {
+    console.error("[img] uploadFromUrl error:", e);
+    return null;
+  }
   } catch {
     return null;
   }
