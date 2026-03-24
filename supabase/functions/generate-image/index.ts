@@ -232,48 +232,12 @@ async function tryPollinations(prompt: string, vm: VisualMode, ctx?: string): Pr
   return null;
 }
 
-// ─── Provider 8: Wikimedia Commons ──────────────────────────────
+// ─── Strict no-random-fallback mode ─────────────────────────────
 
-async function tryWikimedia(prompt: string, ctx?: string): Promise<string | null> {
-  console.log("[img] Wikimedia Commons");
-  const stops = new Set(["the","and","for","with","from","that","this","into","using","showing","image","figure","clean","modern"]);
-  const base = `${ctx || ""} ${prompt}`.replace(/figure\s+\d+/gi, "").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
-  const keywords = base.split(" ").filter(w => w.length > 2 && !stops.has(w.toLowerCase())).slice(0, 6);
-  const query = keywords.join(" ") || prompt.substring(0, 50);
-
-  const u = new URL("https://commons.wikimedia.org/w/api.php");
-  u.searchParams.set("action", "query"); u.searchParams.set("format", "json");
-  u.searchParams.set("generator", "search"); u.searchParams.set("gsrsearch", query);
-  u.searchParams.set("gsrnamespace", "6"); u.searchParams.set("gsrlimit", "5");
-  u.searchParams.set("prop", "imageinfo"); u.searchParams.set("iiprop", "url");
-  
-  try {
-    const res = await fetch(u.toString(), { headers: { "User-Agent": "LovableBot/1.0" } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const pages = Object.values(data?.query?.pages || {}) as any[];
-    const urls = pages.flatMap(p => p.imageinfo?.map((i: any) => i.url) || []).filter((url: string) => /\.(png|jpe?g|webp)$/i.test(url));
-    for (const imgUrl of urls) {
-      const uploaded = await fetchAndUpload(imgUrl);
-      if (uploaded) return uploaded;
-    }
-  } catch (e) { console.error("[img] Wikimedia:", e); }
-  return null;
-}
-
-// ─── Provider 9: Lorem Picsum ───────────────────────────────────
-
-async function tryPicsum(): Promise<string | null> {
-  console.log("[img] Picsum");
-  const seed = Date.now() % 1000;
-  return await fetchAndUpload(`https://picsum.photos/seed/${seed}/1024/768`);
-}
-
-// ─── Provider 10: PlaceKitten / Placeholder ─────────────────────
-
-async function tryPlaceholder(): Promise<string | null> {
-  console.log("[img] Placeholder");
-  return await fetchAndUpload(`https://picsum.photos/seed/${Math.floor(Math.random() * 9999)}/1024/768`);
+function buildNoMatchErrorMessage(isArabicRequest: boolean): string {
+  return isArabicRequest
+    ? "تعذر توليد صورة مطابقة للوصف. تم تعطيل أي صور عشوائية أو بديلة غير مرتبطة بالموضوع، لذلك لن يتم إدراج صورة إلا إذا كانت ناتجة فعلاً من الوصف المطلوب."
+    : "Could not generate an image that matches the prompt. Random or loosely related fallback images are disabled, so no image will be returned unless it is actually generated from the requested description.";
 }
 
 // ─── Main ───────────────────────────────────────────────────────
@@ -285,10 +249,12 @@ serve(async (req) => {
     const { prompt, geminiApiKey, model, context } = await req.json();
     if (!prompt) return new Response(JSON.stringify({ error: "Missing prompt" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    let finalPrompt = await translateToEnglish(prompt);
-    let finalContext = context ? await translateToEnglish(context) : "";
+    const isArabicRequest = containsArabic(prompt) || containsArabic(context || "");
+    const generationMode = model === "pro" ? "pro" : "standard";
+    const finalPrompt = await translateToEnglish(prompt);
+    const finalContext = context ? await translateToEnglish(context) : "";
     const vm = detectVisualMode(finalPrompt, finalContext);
-    console.log(`[img] Mode: ${vm} | "${finalPrompt.substring(0, 80)}"`);
+    console.log(`[img] Mode: ${vm} | Quality: ${generationMode} | "${finalPrompt.substring(0, 80)}"`);
 
     let imageUrl: string | null = null;
     let usedModel = "unknown";
@@ -302,29 +268,36 @@ serve(async (req) => {
     // 2. Server Gemini key
     if (!imageUrl) {
       const sk = Deno.env.get("GEMINI_API_KEY");
-      if (sk) { imageUrl = await tryGeminiDirect(sk, finalPrompt, vm, finalContext); if (imageUrl) usedModel = "gemini-server"; }
+      if (sk) {
+        imageUrl = await tryGeminiDirect(sk, finalPrompt, vm, finalContext);
+        if (imageUrl) usedModel = "gemini-server";
+      }
     }
 
-    // 3. Lovable Gateway
-    if (!imageUrl) { imageUrl = await tryLovableGateway(finalPrompt, vm, finalContext); if (imageUrl) usedModel = "lovable-gateway"; }
+    // 3. Lovable AI Gateway
+    if (!imageUrl) {
+      imageUrl = await tryLovableGateway(finalPrompt, vm, finalContext);
+      if (imageUrl) usedModel = "lovable-gateway";
+    }
 
-    // 4. Cloudflare Workers AI (2 models)
-    if (!imageUrl) { imageUrl = await tryCloudflare(finalPrompt, vm, finalContext); if (imageUrl) usedModel = "cloudflare"; }
+    // 4. Cloudflare Workers AI
+    if (!imageUrl) {
+      imageUrl = await tryCloudflare(finalPrompt, vm, finalContext);
+      if (imageUrl) usedModel = "cloudflare";
+    }
 
-    // 5-8. Pollinations (4 models)
-    if (!imageUrl) { imageUrl = await tryPollinations(finalPrompt, vm, finalContext); if (imageUrl) usedModel = "pollinations"; }
-
-    // 9. Wikimedia Commons
-    if (!imageUrl) { imageUrl = await tryWikimedia(finalPrompt, finalContext); if (imageUrl) usedModel = "wikimedia"; }
-
-    // 10. Picsum
-    if (!imageUrl) { imageUrl = await tryPicsum(); if (imageUrl) usedModel = "picsum"; }
-
-    // 11. Picsum fallback 2
-    if (!imageUrl) { imageUrl = await tryPlaceholder(); if (imageUrl) usedModel = "placeholder"; }
+    // 5. Pollinations prompt-based generation
+    if (!imageUrl) {
+      imageUrl = await tryPollinations(finalPrompt, vm, finalContext);
+      if (imageUrl) usedModel = "pollinations";
+    }
 
     if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "All providers failed" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({
+        error: buildNoMatchErrorMessage(isArabicRequest),
+        code: "NO_PROMPT_MATCHED_IMAGE",
+        randomFallbacksDisabled: true,
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (imageUrl.startsWith("data:")) imageUrl = await uploadDataUrl(imageUrl);
