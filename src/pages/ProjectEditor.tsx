@@ -133,6 +133,8 @@ const ProjectEditor = () => {
         setGenerationState({ active: true, step: isAr ? `🎨 بدء توليد ${matches.length} صورة...` : `🎨 Starting generation of ${matches.length} images...`, progress: 0, phase: 'images' });
 
         const updatedContent = { ...content };
+        // Remove _full key so editor rebuilds from structured content with images
+        delete updatedContent._full;
         let successCount = 0;
         
         for (let m = 0; m < matches.length; m++) {
@@ -187,6 +189,7 @@ const ProjectEditor = () => {
         }
 
         if (successCount > 0) {
+          delete updatedContent._full;
           await saveProject({ content: updatedContent });
           toast({ title: isAr ? `تم توليد ${successCount} من ${matches.length} صورة بنجاح!` : `${successCount} of ${matches.length} images generated successfully!` });
         } else {
