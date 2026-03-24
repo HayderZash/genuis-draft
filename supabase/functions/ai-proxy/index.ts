@@ -319,6 +319,14 @@ serve(async (req) => {
       content = data.choices?.[0]?.message?.content || "";
     }
 
+    // Server-side HTML cleanup for malformed output from fallback providers
+    content = content
+      .replace(/<(\/?)(1|2|3|4|5|6)>/g, '<$1h$2>')
+      .replace(/<head>/g, '<thead>').replace(/<\/head>/g, '</thead>')
+      .replace(/<body>/g, '<tbody>').replace(/<\/body>/g, '</tbody>')
+      .replace(/<tr><thead>/g, '</tr></thead>')
+      .replace(/<tr><tbody>/g, '</tr></tbody>');
+
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
