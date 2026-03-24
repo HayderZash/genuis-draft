@@ -597,6 +597,47 @@ async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMo
   return null;
 }
 
+async function generateWithTogetherAI(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
+  console.log("[generate-image] Using Together AI (FLUX.1-schnell-Free)");
+  try {
+    const fullPrompt = getPrompt(prompt, context, visualMode);
+    const res = await fetch("https://api.together.xyz/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Together AI free tier - no API key needed for free models
+      },
+      body: JSON.stringify({
+        model: "black-forest-labs/FLUX.1-schnell-Free",
+        prompt: fullPrompt,
+        width: 1024,
+        height: 768,
+        steps: 4,
+        n: 1,
+        response_format: "b64_json",
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[generate-image] Together AI failed: ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (b64 && b64.length > 100) {
+      const uploadedUrl = await uploadDataUrlToStorage(`data:image/png;base64,${b64}`);
+      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
+        return uploadedUrl;
+      }
+      console.warn("[generate-image] Rejected Together AI image");
+    }
+  } catch (e) {
+    console.error("[generate-image] Together AI error:", e);
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -660,6 +701,11 @@ serve(async (req) => {
     if (!imageUrl) {
       imageUrl = await generateWithCloudflare(finalPrompt, visualMode, finalContext);
       if (imageUrl) usedModel = "cloudflare-flux";
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithTogetherAI(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "together-flux";
     }
 
     if (!imageUrl) {

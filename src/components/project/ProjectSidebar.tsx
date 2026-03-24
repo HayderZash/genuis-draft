@@ -125,6 +125,51 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         regeneratingIndex={regeneratingIndex}
       />
 
+      {/* Front Matter Options */}
+      <div className="space-y-3">
+        <Label>{lang === 'ar' ? 'القوائم والفهارس' : 'Front Matter'}</Label>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include_toc"
+            checked={project.include_toc || false}
+            onCheckedChange={(v) => onUpdate({ include_toc: !!v })}
+          />
+          <label htmlFor="include_toc" className="text-sm cursor-pointer">
+            {lang === 'ar' ? 'جدول المحتويات' : 'Table of Contents'}
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include_list_of_figures"
+            checked={project.include_list_of_figures || false}
+            onCheckedChange={(v) => onUpdate({ include_list_of_figures: !!v })}
+          />
+          <label htmlFor="include_list_of_figures" className="text-sm cursor-pointer">
+            {lang === 'ar' ? 'قائمة الأشكال' : 'List of Figures'}
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include_list_of_tables"
+            checked={project.include_list_of_tables || false}
+            onCheckedChange={(v) => onUpdate({ include_list_of_tables: !!v })}
+          />
+          <label htmlFor="include_list_of_tables" className="text-sm cursor-pointer">
+            {lang === 'ar' ? 'قائمة الجداول' : 'List of Tables'}
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="include_abbreviations"
+            checked={project.include_abbreviations || false}
+            onCheckedChange={(v) => onUpdate({ include_abbreviations: !!v })}
+          />
+          <label htmlFor="include_abbreviations" className="text-sm cursor-pointer">
+            {lang === 'ar' ? 'قائمة الاختصارات' : 'List of Abbreviations'}
+          </label>
+        </div>
+      </div>
+
       {/* Content Options */}
       <div className="space-y-3">
         <Label>{t('tablesAndLists')}</Label>

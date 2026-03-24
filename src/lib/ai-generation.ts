@@ -208,8 +208,22 @@ Each image should have one clear main subject and a clean modern composition.`)
 
     const tableInstruction = includeTables
       ? (researchLang === 'ar'
-        ? `أضف جداول بيانات بتنسيق HTML مع عنوان <p><strong>جدول ${chapterNum}.X: الوصف</strong></p> متبوعاً بـ <table>.`
-        : `Add data tables with <p><strong>Table ${chapterNum}.X: Description</strong></p> followed by <table>.`)
+        ? `مهم جداً: يجب أن تضيف جداول بيانات حقيقية بتنسيق HTML كامل. كل جدول يجب أن يكون بالتنسيق التالي بالضبط:
+<p><strong>جدول ${chapterNum}.X: وصف الجدول</strong></p>
+<table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
+<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">العمود 1</th><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">العمود 2</th></tr></thead>
+<tbody><tr><td style="border:1px solid #000;padding:8px;">القيمة</td><td style="border:1px solid #000;padding:8px;">القيمة</td></tr></tbody>
+</table>
+لا تكتب الجداول كنصوص عادية أبداً. يجب أن تكون عناصر <table> حقيقية مع <thead> و <tbody> و <tr> و <th> و <td>.
+أضف 2-3 جداول بيانات في هذا الفصل موزعة بين الفقرات.`
+        : `CRITICAL: You MUST add real HTML data tables. Each table MUST follow this exact format:
+<p><strong>Table ${chapterNum}.X: Table Description</strong></p>
+<table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
+<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column 1</th><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column 2</th></tr></thead>
+<tbody><tr><td style="border:1px solid #000;padding:8px;">Value</td><td style="border:1px solid #000;padding:8px;">Value</td></tr></tbody>
+</table>
+NEVER write tables as plain text. They MUST be actual <table> elements with <thead>, <tbody>, <tr>, <th>, <td>.
+Add 2-3 data tables distributed between paragraphs in this chapter.`)
       : '';
 
     const noRefsInChapter = researchLang === 'ar'
@@ -343,10 +357,10 @@ export async function regenerateChapter({ project, lang, chapterIndex, onProgres
 Place them BETWEEN paragraphs, not at the end.`)
     : '';
 
-  const tableInstruction = includeTables
+    const tableInstruction = includeTables
     ? (researchLang === 'ar'
-      ? `أضف جداول بيانات بتنسيق HTML مع عنوان <p><strong>جدول ${chapterNum}.X: الوصف</strong></p> متبوعاً بـ <table>.`
-      : `Add data tables with <p><strong>Table ${chapterNum}.X: Description</strong></p> followed by <table>.`)
+      ? `أضف جداول بيانات حقيقية بتنسيق HTML كامل مع <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. لا تكتب الجداول كنص عادي.`
+      : `Add real HTML tables with <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. NEVER write tables as plain text.`)
     : '';
 
   const noRefsInChapter = researchLang === 'ar'

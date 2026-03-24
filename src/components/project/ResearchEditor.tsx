@@ -4,6 +4,10 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
+import { Table as TiptapTable } from '@tiptap/extension-table';
+import { TableRow as TiptapTableRow } from '@tiptap/extension-table-row';
+import { TableCell as TiptapTableCell } from '@tiptap/extension-table-cell';
+import { TableHeader as TiptapTableHeader } from '@tiptap/extension-table-header';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { EditorToolbar } from './EditorToolbar';
 import type { ProjectData } from '@/pages/ProjectEditor';
@@ -45,6 +49,11 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
       StarterKit,
       Underline,
       Image.configure({ inline: false, allowBase64: true }),
+      TiptapTable.configure({ resizable: true }),
+      TiptapTableRow,
+      TiptapTableCell,
+      TiptapTableHeader,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
     ],
     content: buildHtml(),
@@ -93,10 +102,17 @@ export const ResearchEditor = ({ project, onContentChange }: Props) => {
         }
         .research-editor img { max-width: 80%; border-radius: 8px; margin: 12px auto; display: block; }
         .research-editor .generated-figure { text-align: center; margin: 16px 0; }
+        .research-editor table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+        .research-editor table th, .research-editor table td { border: 1px solid #333; padding: 8px 12px; text-align: center; }
+        .research-editor table th { background: #e8e8e8; font-weight: bold; }
+        .research-editor table thead th { background: #d5e8f0; }
         .research-editor { font-family: "Times New Roman", Times, serif; }
         .ProseMirror { min-height: 60vh; }
         .ProseMirror:focus { outline: none; }
         .ProseMirror img { max-width: 80%; border-radius: 8px; margin: 12px auto; display: block; }
+        .ProseMirror table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        .ProseMirror table th, .ProseMirror table td { border: 1px solid #333; padding: 8px 12px; text-align: center; }
+        .ProseMirror table th { background: #d5e8f0; font-weight: bold; }
       `}</style>
       <EditorToolbar editor={editor} />
       <EditorContent editor={editor} />
