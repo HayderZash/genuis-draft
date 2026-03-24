@@ -88,7 +88,7 @@ serve(async (req) => {
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt },
                       ],
-                      max_tokens: Math.min(maxTokens || 4000, 4000),
+                      max_tokens: maxTokens || 8000,
                       temperature: temperature ?? 0.7,
                     }),
                   }
@@ -112,7 +112,7 @@ serve(async (req) => {
                           { role: "system", content: systemPrompt },
                           { role: "user", content: userPrompt },
                         ],
-                        max_tokens: Math.min(maxTokens || 4000, 4000),
+                        max_tokens: maxTokens || 8000,
                       }),
                     });
 
@@ -318,6 +318,14 @@ serve(async (req) => {
       const data = await response.json();
       content = data.choices?.[0]?.message?.content || "";
     }
+
+    // Server-side HTML cleanup for malformed output from fallback providers
+    content = content
+      .replace(/<(\/?)(1|2|3|4|5|6)>/g, '<$1h$2>')
+      .replace(/<head>/g, '<thead>').replace(/<\/head>/g, '</thead>')
+      .replace(/<body>/g, '<tbody>').replace(/<\/body>/g, '</tbody>')
+      .replace(/<tr><thead>/g, '</tr></thead>')
+      .replace(/<tr><tbody>/g, '</tr></tbody>');
 
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
