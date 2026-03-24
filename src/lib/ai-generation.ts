@@ -15,6 +15,23 @@ interface GenerateParams {
 
 const WORDS_PER_PAGE = 200;
 
+/** Strong anti-repetition and quality rules */
+const QUALITY_RULES_AR = `قواعد الجودة الصارمة:
+- ممنوع تكرار أي جملة أو فكرة بصياغة مختلفة. كل فقرة يجب أن تضيف معلومة جديدة 100%.
+- لا تستخدم عبارات عامة فارغة مثل "يعد X أداة قوية" أو "يمكن أن يعد X". اكتب معلومات تقنية محددة بأرقام وتفاصيل.
+- كل فقرة يجب أن تحتوي على حقائق محددة: أرقام، مواصفات تقنية، مقارنات، أمثلة واقعية.
+- لا تكتب مقدمات طويلة. ادخل في صلب الموضوع مباشرة.
+- لا تكتب "في هذا السياق" أو "يمكن أن يعد" أو "من المهم الإشارة إلى" - هذه حشو.
+- اكتب كأنك خبير يشرح لطالب دراسات عليا، وليس كمقالة عامة.`;
+
+const QUALITY_RULES_EN = `Strict quality rules:
+- NEVER repeat any sentence or idea in different wording. Each paragraph MUST add 100% new information.
+- Do NOT use vague phrases like "X is a powerful tool" or "X can be considered". Write specific technical information with numbers and details.
+- Each paragraph MUST contain specific facts: numbers, technical specifications, comparisons, real-world examples.
+- Do NOT write lengthy introductions. Get to the point immediately.
+- Do NOT use filler phrases like "In this context", "It can be considered", "It is important to note" - these are padding.
+- Write as an expert explaining to a graduate student, NOT as a generic article.`;
+
 /** Delay helper */
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -128,11 +145,17 @@ export async function generateResearch({ project, lang, onProgress, t }: Generat
   // Generate Abstract
   onProgress(t('generatingAbstract'), 3);
   const abstractSystemPrompt = researchLang === 'ar'
-    ? 'أنت خبير أكاديمي. اكتب ملخصاً أكاديمياً (Abstract) بتنسيق HTML. استخدم <h1> للعنوان و <p> للنص. اكتب باللغة العربية فقط.'
-    : 'You are an academic expert. Write an academic abstract in HTML. Use <h1> for title and <p> for text. Write in English only.';
+    ? `أنت خبير أكاديمي متخصص. اكتب ملخصاً أكاديمياً (Abstract) بتنسيق HTML. استخدم <h1> للعنوان و <p> للنص. اكتب باللغة العربية فقط. ${QUALITY_RULES_AR}`
+    : `You are a specialized academic expert. Write an academic abstract in HTML. Use <h1> for title and <p> for text. Write in English only. ${QUALITY_RULES_EN}`;
   const abstractUserPrompt = researchLang === 'ar'
-    ? `اكتب ملخصاً أكاديمياً (Abstract) لبحث بعنوان "${project.title}". يجب أن يكون الملخص باللغة العربية ويلخص أهداف البحث ومنهجيته وأهم نتائجه في 200-300 كلمة.`
-    : `Write an academic abstract for a research paper titled "${project.title}". Summarize objectives, methodology, and key findings in 200-300 words.`;
+    ? `اكتب ملخصاً أكاديمياً (Abstract) لبحث بعنوان "${project.title}".
+النبذة: ${project.abstract || 'غير محدد'}.
+يجب أن يكون الملخص 200-300 كلمة يلخص: الهدف، المنهجية، النتائج الرئيسية، والخلاصة.
+اكتب بدقة وتحديد. لا تكرر أي جملة.`
+    : `Write an academic abstract for a research paper titled "${project.title}".
+Abstract context: ${project.abstract || 'Not specified'}.
+Must be 200-300 words covering: objective, methodology, key results, and conclusion.
+Be precise and specific. Do NOT repeat any sentence.`;
   
   try {
     const rawAbstract = await callAI(abstractSystemPrompt, abstractUserPrompt, 1500, 0.5);
@@ -248,7 +271,8 @@ ${figureInstruction ? `- ${figureInstruction}` : ''}
 ${tableInstruction ? `- ${tableInstruction}` : ''}
 ${projectComponentsInstruction ? `- ${projectComponentsInstruction}` : ''}
 - ${noRefsInChapter}
-- لا تستخدم رموز خاصة أو أكواد Unicode غير عربية.`
+- لا تستخدم رموز خاصة أو أكواد Unicode غير عربية.
+${QUALITY_RULES_AR}`
       : `You are an academic expert. Write in formal academic English. ${dirInstruction}
 Formatting rules:
 - Use HTML only (no Markdown).
@@ -258,7 +282,8 @@ ${figureInstruction ? `- ${figureInstruction}` : ''}
 ${tableInstruction ? `- ${tableInstruction}` : ''}
 ${projectComponentsInstruction ? `- ${projectComponentsInstruction}` : ''}
 - ${noRefsInChapter}
-- Do not use special symbols or unusual Unicode characters.`;
+- Do not use special symbols or unusual Unicode characters.
+${QUALITY_RULES_EN}`;
 
     const userPrompt = researchLang === 'ar'
       ? `اكتب الفصل "${chapterName}" لبحث بعنوان "${project.title}".
@@ -269,12 +294,12 @@ ${pageCountStrict}
 1. ابدأ بعنوان الفصل بتنسيق <h1>.
 2. اكتب مقدمة الفصل في فقرتين على الأقل.
 3. قسّم المحتوى إلى أقسام فرعية واضحة بعناوين <h2>.
-4. لكل قسم فرعي، اكتب 3-5 فقرات مفصلة ومعمقة.
+4. لكل قسم فرعي، اكتب 2-4 فقرات مفصلة بمعلومات تقنية محددة.
 5. إذا احتاج القسم لتفصيل أكبر، أضف عناوين <h3>.
-    6. اختم الفصل بفقرة ملخصة.
+6. اختم الفصل بفقرة ملخصة.
 ${isLast ? 'هذا هو الفصل الأخير - اكتب خاتمة شاملة.' : ''}${refsInstruction}
 
-مهم: اكتب بعمق وإيجاز. لا تكرر نفس الأفكار أو الجمل بصياغات مختلفة.`
+تحذير صارم: لا تكرر أي فكرة أو جملة بصياغة مختلفة. كل فقرة يجب أن تقدم معلومة جديدة تماماً. إذا وجدت نفسك تكرر، انتقل للنقطة التالية فوراً.`
       : `Write chapter "${chapterName}" for a research paper titled "${project.title}".
 Abstract: ${project.abstract || 'Not specified'}.
 ${pageCountStrict}
@@ -283,15 +308,15 @@ Instructions:
 1. Start with the chapter title in <h1>.
 2. Write an introduction of at least 2 paragraphs.
 3. Divide content into clear subsections with <h2> headings.
-4. For each subsection, write 3-5 detailed, in-depth paragraphs.
+4. For each subsection, write 2-4 detailed paragraphs with specific technical information.
 5. Add <h3> subheadings where more detail is needed.
 6. End the chapter with a summary paragraph.
 ${isLast ? 'This is the final chapter - write a comprehensive conclusion.' : ''}${refsInstruction}
 
-Important: Write in-depth but concisely. Do NOT repeat the same ideas in different wordings.`;
+STRICT WARNING: Do NOT repeat any idea or sentence in different wording. Each paragraph MUST present entirely new information. If you find yourself repeating, move to the next point immediately.`;
 
     try {
-      const raw = await callAI(systemPrompt, userPrompt, 8000, 0.7);
+      const raw = await callAI(systemPrompt, userPrompt, 8000, 0.8);
       content[`chapter_${i}`] = cleanHtmlOutput(raw);
       onProgress(progressStep, baseProgress + (70 / totalChapters) * 0.8);
       console.log(`[Gen] Chapter ${i + 1} done, length: ${content[`chapter_${i}`].length}`);
@@ -398,7 +423,7 @@ Write paragraph by paragraph in full detail. Use clear subsections.
 ${isLast ? 'Final chapter.' : ''}${refsInstruction}`;
 
   onProgress(`${t('draftingChapter')} ${chapterIndex + 1}: ${chapterName}`, 50);
-  const raw = await callAI(systemPrompt, userPrompt, 8000, 0.7);
+  const raw = await callAI(systemPrompt, userPrompt, 8000, 0.8);
   const chapterContent = cleanHtmlOutput(raw);
 
   onProgress(t('finalizing'), 90);
