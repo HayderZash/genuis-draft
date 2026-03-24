@@ -129,11 +129,99 @@ async function callAI(
 
 /** Strip markdown code fences from AI output */
 function cleanHtmlOutput(text: string): string {
-  return text
+  let cleaned = text
     .replace(/^```html\s*/gi, '')
     .replace(/^```\s*/gm, '')
     .replace(/```\s*$/g, '')
     .trim();
+  
+  // Post-process: convert any text-based tables to HTML tables
+  cleaned = convertTextTablesToHtml(cleaned);
+  
+  return cleaned;
+}
+
+/** Convert text-based tables (lines with | separators or tab-separated) to HTML tables */
+function convertTextTablesToHtml(html: string): string {
+  // Match blocks that look like text tables: lines with multiple tab or pipe separators
+  // Pattern: "Header1 | Header2 | Header3\nValue1 | Value2 | Value3" or tab-separated
+  const lines = html.split('\n');
+  let result: string[] = [];
+  let tableLines: string[] = [];
+  let inTable = false;
+  
+  const isTableLine = (line: string): boolean => {
+    const stripped = line.replace(/<[^>]+>/g, '').trim();
+    if (!stripped) return false;
+    // Check for pipe-separated (at least 2 pipes) or tab-separated (at least 2 tabs)
+    const pipeCount = (stripped.match(/\|/g) || []).length;
+    const tabCount = (stripped.match(/\t/g) || []).length;
+    // Also check for separator lines like "---+---+---" or "---|---|---"
+    if (/^[\s|+\-:]+$/.test(stripped)) return inTable; // separator line only counts if already in table
+    return pipeCount >= 2 || tabCount >= 2;
+  };
+  
+  const flushTable = () => {
+    if (tableLines.length < 2) {
+      result.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+    
+    // Parse the text table into HTML
+    const rows = tableLines
+      .map(l => l.replace(/<[^>]+>/g, '').trim())
+      .filter(l => !/^[\s|+\-:]+$/.test(l)) // remove separator lines
+      .filter(l => l.length > 0);
+    
+    if (rows.length < 2) {
+      result.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+    
+    const splitRow = (row: string): string[] => {
+      if (row.includes('|')) {
+        return row.split('|').map(c => c.trim()).filter(c => c.length > 0);
+      }
+      return row.split('\t').map(c => c.trim()).filter(c => c.length > 0);
+    };
+    
+    let tableHtml = '<table border="1" style="border-collapse:collapse;width:100%;text-align:center;margin:10px auto;">';
+    tableHtml += '<thead><tr>';
+    const headerCells = splitRow(rows[0]);
+    for (const cell of headerCells) {
+      tableHtml += `<th style="border:1px solid #000;padding:8px;background:#f0f0f0;">${cell}</th>`;
+    }
+    tableHtml += '</tr></thead><tbody>';
+    for (let r = 1; r < rows.length; r++) {
+      const cells = splitRow(rows[r]);
+      tableHtml += '<tr>';
+      for (const cell of cells) {
+        tableHtml += `<td style="border:1px solid #000;padding:8px;">${cell}</td>`;
+      }
+      tableHtml += '</tr>';
+    }
+    tableHtml += '</tbody></table>';
+    result.push(tableHtml);
+    tableLines = [];
+  };
+  
+  for (const line of lines) {
+    if (isTableLine(line)) {
+      inTable = true;
+      tableLines.push(line);
+    } else {
+      if (inTable) {
+        flushTable();
+        inTable = false;
+      }
+      result.push(line);
+    }
+  }
+  if (inTable) flushTable();
+  
+  return result.join('\n');
 }
 
 export async function generateResearch({ project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
@@ -231,22 +319,28 @@ Each image should have one clear main subject and a clean modern composition.`)
 
     const tableInstruction = includeTables
       ? (researchLang === 'ar'
-        ? `مهم جداً: يجب أن تضيف جداول بيانات حقيقية بتنسيق HTML كامل. كل جدول يجب أن يكون بالتنسيق التالي بالضبط:
-<p><strong>جدول ${chapterNum}.X: وصف الجدول</strong></p>
-<table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
-<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">العمود 1</th><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">العمود 2</th></tr></thead>
-<tbody><tr><td style="border:1px solid #000;padding:8px;">القيمة</td><td style="border:1px solid #000;padding:8px;">القيمة</td></tr></tbody>
+        ? `قاعدة إلزامية للجداول - لا يمكن تجاوزها:
+كل جدول في هذا الفصل يجب أن يكون عنصر <table> HTML حقيقي. ممنوع منعاً باتاً كتابة الجداول كنص عادي أو استخدام مسافات أو أعمدة نصية.
+النموذج الإلزامي الوحيد المقبول:
+<p style="text-align:center;"><strong>جدول ${chapterNum}.X: وصف الجدول</strong></p>
+<table border="1" style="border-collapse:collapse;width:100%;text-align:center;margin:10px auto;">
+<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">رأس العمود</th></tr></thead>
+<tbody><tr><td style="border:1px solid #000;padding:8px;">القيمة الفعلية</td></tr></tbody>
 </table>
-لا تكتب الجداول كنصوص عادية أبداً. يجب أن تكون عناصر <table> حقيقية مع <thead> و <tbody> و <tr> و <th> و <td>.
-أضف 2-3 جداول بيانات في هذا الفصل موزعة بين الفقرات.`
-        : `CRITICAL: You MUST add real HTML data tables. Each table MUST follow this exact format:
-<p><strong>Table ${chapterNum}.X: Table Description</strong></p>
-<table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
-<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column 1</th><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column 2</th></tr></thead>
-<tbody><tr><td style="border:1px solid #000;padding:8px;">Value</td><td style="border:1px solid #000;padding:8px;">Value</td></tr></tbody>
+يجب أن يحتوي كل جدول على بيانات حقيقية ومحددة (أرقام، قياسات، مواصفات) وليس بيانات عامة.
+أضف 2-3 جداول موزعة بين الفقرات. كل جدول يجب أن يحتوي 3 أعمدة على الأقل و4 صفوف على الأقل.
+تذكر: أي جدول ليس عنصر <table> HTML سيتم رفضه تلقائياً.`
+        : `MANDATORY TABLE RULE - Cannot be bypassed:
+Every table in this chapter MUST be a real HTML <table> element. Writing tables as plain text, using spaces, or text columns is STRICTLY FORBIDDEN.
+The ONLY acceptable format:
+<p style="text-align:center;"><strong>Table ${chapterNum}.X: Table Description</strong></p>
+<table border="1" style="border-collapse:collapse;width:100%;text-align:center;margin:10px auto;">
+<thead><tr><th style="border:1px solid #000;padding:8px;background:#f0f0f0;">Column Header</th></tr></thead>
+<tbody><tr><td style="border:1px solid #000;padding:8px;">Actual Value</td></tr></tbody>
 </table>
-NEVER write tables as plain text. They MUST be actual <table> elements with <thead>, <tbody>, <tr>, <th>, <td>.
-Add 2-3 data tables distributed between paragraphs in this chapter.`)
+Each table MUST contain real, specific data (numbers, measurements, specifications) - NOT generic placeholder data.
+Add 2-3 tables distributed between paragraphs. Each table must have at least 3 columns and 4 rows.
+REMEMBER: Any table that is NOT an HTML <table> element will be automatically rejected.`)
       : '';
 
     const noRefsInChapter = researchLang === 'ar'
@@ -384,8 +478,8 @@ Place them BETWEEN paragraphs, not at the end.`)
 
     const tableInstruction = includeTables
     ? (researchLang === 'ar'
-      ? `أضف جداول بيانات حقيقية بتنسيق HTML كامل مع <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. لا تكتب الجداول كنص عادي.`
-      : `Add real HTML tables with <table border="1"><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>. NEVER write tables as plain text.`)
+      ? `قاعدة إلزامية: كل جدول يجب أن يكون عنصر <table> HTML حقيقي مع <thead> و <tbody>. ممنوع كتابة الجداول كنص. أضف 2-3 جداول بأرقام وبيانات حقيقية. كل جدول 3 أعمدة و4 صفوف على الأقل.`
+      : `MANDATORY: Every table MUST be a real HTML <table> element with <thead> and <tbody>. NEVER write tables as text. Add 2-3 tables with real data. Each table must have at least 3 columns and 4 rows.`)
     : '';
 
   const noRefsInChapter = researchLang === 'ar'
