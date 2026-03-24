@@ -1,0 +1,1 @@
+ALTER TABLE public.research_projects ADD COLUMN IF NOT EXISTS include_abbreviations boolean NOT NULL DEFAULT false;
