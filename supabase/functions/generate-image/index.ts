@@ -663,6 +663,11 @@ serve(async (req) => {
     }
 
     if (!imageUrl) {
+      imageUrl = await generateWithTogetherAI(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "together-flux";
+    }
+
+    if (!imageUrl) {
       imageUrl = await generateWithWikimediaCommons(finalPrompt, visualMode, finalContext);
       if (imageUrl) usedModel = "wikimedia-commons";
     }
