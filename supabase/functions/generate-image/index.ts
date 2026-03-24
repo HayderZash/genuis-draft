@@ -752,7 +752,27 @@ serve(async (req) => {
     }
 
     if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "High-quality image generation failed. The premium providers are temporarily unavailable or out of quota." }), {
+      imageUrl = await generateWithUnsplashSource(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "unsplash-source";
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithLoremFlickr(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "loremflickr";
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithPicsum(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "picsum";
+    }
+
+    if (!imageUrl) {
+      imageUrl = await generateWithPlaceholdNature(finalPrompt, visualMode, finalContext);
+      if (imageUrl) usedModel = "placehold";
+    }
+
+    if (!imageUrl) {
+      return new Response(JSON.stringify({ error: "Image generation failed after trying all configured providers, including 5+ free fallbacks." }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
