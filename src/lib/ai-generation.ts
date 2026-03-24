@@ -129,11 +129,99 @@ async function callAI(
 
 /** Strip markdown code fences from AI output */
 function cleanHtmlOutput(text: string): string {
-  return text
+  let cleaned = text
     .replace(/^```html\s*/gi, '')
     .replace(/^```\s*/gm, '')
     .replace(/```\s*$/g, '')
     .trim();
+  
+  // Post-process: convert any text-based tables to HTML tables
+  cleaned = convertTextTablesToHtml(cleaned);
+  
+  return cleaned;
+}
+
+/** Convert text-based tables (lines with | separators or tab-separated) to HTML tables */
+function convertTextTablesToHtml(html: string): string {
+  // Match blocks that look like text tables: lines with multiple tab or pipe separators
+  // Pattern: "Header1 | Header2 | Header3\nValue1 | Value2 | Value3" or tab-separated
+  const lines = html.split('\n');
+  let result: string[] = [];
+  let tableLines: string[] = [];
+  let inTable = false;
+  
+  const isTableLine = (line: string): boolean => {
+    const stripped = line.replace(/<[^>]+>/g, '').trim();
+    if (!stripped) return false;
+    // Check for pipe-separated (at least 2 pipes) or tab-separated (at least 2 tabs)
+    const pipeCount = (stripped.match(/\|/g) || []).length;
+    const tabCount = (stripped.match(/\t/g) || []).length;
+    // Also check for separator lines like "---+---+---" or "---|---|---"
+    if (/^[\s|+\-:]+$/.test(stripped)) return inTable; // separator line only counts if already in table
+    return pipeCount >= 2 || tabCount >= 2;
+  };
+  
+  const flushTable = () => {
+    if (tableLines.length < 2) {
+      result.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+    
+    // Parse the text table into HTML
+    const rows = tableLines
+      .map(l => l.replace(/<[^>]+>/g, '').trim())
+      .filter(l => !/^[\s|+\-:]+$/.test(l)) // remove separator lines
+      .filter(l => l.length > 0);
+    
+    if (rows.length < 2) {
+      result.push(...tableLines);
+      tableLines = [];
+      return;
+    }
+    
+    const splitRow = (row: string): string[] => {
+      if (row.includes('|')) {
+        return row.split('|').map(c => c.trim()).filter(c => c.length > 0);
+      }
+      return row.split('\t').map(c => c.trim()).filter(c => c.length > 0);
+    };
+    
+    let tableHtml = '<table border="1" style="border-collapse:collapse;width:100%;text-align:center;margin:10px auto;">';
+    tableHtml += '<thead><tr>';
+    const headerCells = splitRow(rows[0]);
+    for (const cell of headerCells) {
+      tableHtml += `<th style="border:1px solid #000;padding:8px;background:#f0f0f0;">${cell}</th>`;
+    }
+    tableHtml += '</tr></thead><tbody>';
+    for (let r = 1; r < rows.length; r++) {
+      const cells = splitRow(rows[r]);
+      tableHtml += '<tr>';
+      for (const cell of cells) {
+        tableHtml += `<td style="border:1px solid #000;padding:8px;">${cell}</td>`;
+      }
+      tableHtml += '</tr>';
+    }
+    tableHtml += '</tbody></table>';
+    result.push(tableHtml);
+    tableLines = [];
+  };
+  
+  for (const line of lines) {
+    if (isTableLine(line)) {
+      inTable = true;
+      tableLines.push(line);
+    } else {
+      if (inTable) {
+        flushTable();
+        inTable = false;
+      }
+      result.push(line);
+    }
+  }
+  if (inTable) flushTable();
+  
+  return result.join('\n');
 }
 
 export async function generateResearch({ project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
