@@ -325,6 +325,37 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   return uploadBytesToStorage(imageBytes, mimeType);
 }
 
+async function downloadRemoteImageToStorage(
+  remoteUrl: string,
+  prompt: string,
+  visualMode: VisualMode,
+  context?: string,
+  extraHeaders?: Record<string, string>,
+): Promise<string | null> {
+  try {
+    const imageResponse = await fetch(remoteUrl, {
+      headers: extraHeaders,
+    });
+
+    if (!imageResponse.ok) return null;
+
+    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+    if (!contentType.startsWith("image/")) return null;
+
+    const bytes = new Uint8Array(await imageResponse.arrayBuffer());
+    if (!bytes.byteLength) return null;
+
+    const uploadedUrl = await uploadBytesToStorage(bytes, contentType);
+    if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
+      return uploadedUrl;
+    }
+  } catch (e) {
+    console.error("[generate-image] Remote image download failed:", e);
+  }
+
+  return null;
+}
+
 async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, visualMode: VisualMode, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gateway) {
     console.log(`[generate-image] Trying Lovable gateway: ${model}`);
