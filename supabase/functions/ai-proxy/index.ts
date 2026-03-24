@@ -68,34 +68,80 @@ serve(async (req) => {
             content = gData.candidates?.[0]?.content?.parts?.[0]?.text || "";
             console.log("[ai-proxy] Gemini fallback success, length:", content.length);
           } else {
-            console.error("[ai-proxy] Gemini fallback failed:", geminiResp.status, "trying OpenRouter free");
-            // 3rd fallback: OpenRouter free models (no key needed for some)
-            try {
-              const orResp = await fetch("https://text.pollinations.ai/openai", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: "openai",
-                  messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt },
-                  ],
-                  max_tokens: maxTokens || 4000,
-                }),
-              });
-              if (orResp.ok) {
-                const orData = await orResp.json();
-                content = orData.choices?.[0]?.message?.content || "";
-                console.log("[ai-proxy] Pollinations fallback success, length:", content.length);
-              } else {
-                console.error("[ai-proxy] All fallbacks failed");
-                return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Please try again in a few minutes." }), {
+            console.error("[ai-proxy] Gemini fallback failed:", geminiResp.status, "trying Cloudflare");
+
+            const CLOUDFLARE_ACCOUNT_ID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+            const CLOUDFLARE_API_TOKEN = Deno.env.get("CLOUDFLARE_API_TOKEN");
+
+            if (CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_API_TOKEN) {
+              try {
+                const cfResp = await fetch(
+                  `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+                    },
+                    body: JSON.stringify({
+                      messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt },
+                      ],
+                      max_tokens: Math.min(maxTokens || 4000, 4000),
+                      temperature: temperature ?? 0.7,
+                    }),
+                  }
+                );
+
+                if (cfResp.ok) {
+                  const cfData = await cfResp.json();
+                  content = cfData.result?.response || "";
+                  console.log("[ai-proxy] Cloudflare fallback success, length:", content.length);
+                } else {
+                  const cfText = await cfResp.text().catch(() => "");
+                  console.error("[ai-proxy] Cloudflare fallback failed:", cfResp.status, cfText);
+
+                  try {
+                    const pollinationsResp = await fetch("https://text.pollinations.ai/openai", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        model: "openai",
+                        messages: [
+                          { role: "system", content: systemPrompt },
+                          { role: "user", content: userPrompt },
+                        ],
+                        max_tokens: Math.min(maxTokens || 4000, 4000),
+                      }),
+                    });
+
+                    if (pollinationsResp.ok) {
+                      const pollinationsData = await pollinationsResp.json();
+                      content = pollinationsData.choices?.[0]?.message?.content || "";
+                      console.log("[ai-proxy] Pollinations fallback success, length:", content.length);
+                    } else {
+                      const pollinationsText = await pollinationsResp.text().catch(() => "");
+                      console.error("[ai-proxy] Pollinations fallback failed:", pollinationsResp.status, pollinationsText);
+                      return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Lovable credits are exhausted, Gemini is rate limited, and backup providers also failed." }), {
+                        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+                      });
+                    }
+                  } catch (pollinationsError) {
+                    console.error("[ai-proxy] Pollinations error:", pollinationsError);
+                    return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Please try again shortly." }), {
+                      status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    });
+                  }
+                }
+              } catch (cloudflareError) {
+                console.error("[ai-proxy] Cloudflare error:", cloudflareError);
+                return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Please try again shortly." }), {
                   status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
                 });
               }
-            } catch (e3) {
-              console.error("[ai-proxy] Pollinations error:", e3);
-              return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable." }), {
+            } else {
+              return new Response(JSON.stringify({ error: "No backup AI providers are configured." }), {
                 status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
               });
             }
