@@ -47,115 +47,23 @@ serve(async (req) => {
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         console.error("Lovable AI error:", response.status, errText);
-        // Fallback to Gemini API on 402/429
-        const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
-        if (GEMINI_KEY && (response.status === 402 || response.status === 429)) {
-          console.log("[ai-proxy] Lovable failed, falling back to Gemini API");
-          const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
-          const geminiResp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ role: "user", parts: [{ text: combinedPrompt }] }],
-                generationConfig: { maxOutputTokens: maxTokens || 8000, temperature: temperature ?? 0.7 },
-              }),
-            }
-          );
-          if (geminiResp.ok) {
-            const gData = await geminiResp.json();
-            content = gData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            console.log("[ai-proxy] Gemini fallback success, length:", content.length);
-          } else {
-            console.error("[ai-proxy] Gemini fallback failed:", geminiResp.status, "trying Cloudflare");
-
-            const CLOUDFLARE_ACCOUNT_ID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-            const CLOUDFLARE_API_TOKEN = Deno.env.get("CLOUDFLARE_API_TOKEN");
-
-            if (CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_API_TOKEN) {
-              try {
-                const cfResp = await fetch(
-                  `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
-                    },
-                    body: JSON.stringify({
-                      messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: userPrompt },
-                      ],
-                      max_tokens: maxTokens || 8000,
-                      temperature: temperature ?? 0.7,
-                    }),
-                  }
-                );
-
-                if (cfResp.ok) {
-                  const cfData = await cfResp.json();
-                  content = cfData.result?.response || "";
-                  console.log("[ai-proxy] Cloudflare fallback success, length:", content.length);
-                } else {
-                  const cfText = await cfResp.text().catch(() => "");
-                  console.error("[ai-proxy] Cloudflare fallback failed:", cfResp.status, cfText);
-
-                  try {
-                    const pollinationsResp = await fetch("https://text.pollinations.ai/openai", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        model: "openai",
-                        messages: [
-                          { role: "system", content: systemPrompt },
-                          { role: "user", content: userPrompt },
-                        ],
-                        max_tokens: maxTokens || 8000,
-                      }),
-                    });
-
-                    if (pollinationsResp.ok) {
-                      const pollinationsData = await pollinationsResp.json();
-                      content = pollinationsData.choices?.[0]?.message?.content || "";
-                      console.log("[ai-proxy] Pollinations fallback success, length:", content.length);
-                    } else {
-                      const pollinationsText = await pollinationsResp.text().catch(() => "");
-                      console.error("[ai-proxy] Pollinations fallback failed:", pollinationsResp.status, pollinationsText);
-                      return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Lovable credits are exhausted, Gemini is rate limited, and backup providers also failed." }), {
-                        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-                      });
-                    }
-                  } catch (pollinationsError) {
-                    console.error("[ai-proxy] Pollinations error:", pollinationsError);
-                    return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Please try again shortly." }), {
-                      status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-                    });
-                  }
-                }
-              } catch (cloudflareError) {
-                console.error("[ai-proxy] Cloudflare error:", cloudflareError);
-                return new Response(JSON.stringify({ error: "All AI providers temporarily unavailable. Please try again shortly." }), {
-                  status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-                });
-              }
-            } else {
-              return new Response(JSON.stringify({ error: "No backup AI providers are configured." }), {
-                status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-              });
-            }
-          }
-        } else {
-          return new Response(JSON.stringify({ error: `AI error: ${response.status}` }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded (429)" }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-      } else {
-        const data = await response.json();
-        content = data.choices?.[0]?.message?.content || "";
-        console.log("[ai-proxy] Lovable AI success, content length:", content.length);
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "Payment required (402)" }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ error: `AI error: ${response.status} - ${errText.substring(0, 200)}` }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || "";
+      console.log("[ai-proxy] Lovable AI success, content length:", content.length);
 
     } else if (provider === "gemini") {
       const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
@@ -318,14 +226,6 @@ serve(async (req) => {
       const data = await response.json();
       content = data.choices?.[0]?.message?.content || "";
     }
-
-    // Server-side HTML cleanup for malformed output from fallback providers
-    content = content
-      .replace(/<(\/?)(1|2|3|4|5|6)>/g, '<$1h$2>')
-      .replace(/<head>/g, '<thead>').replace(/<\/head>/g, '</thead>')
-      .replace(/<body>/g, '<tbody>').replace(/<\/body>/g, '</tbody>')
-      .replace(/<tr><thead>/g, '</tr></thead>')
-      .replace(/<tr><tbody>/g, '</tr></tbody>');
 
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

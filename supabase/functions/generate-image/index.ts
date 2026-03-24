@@ -325,37 +325,6 @@ async function uploadDataUrlToStorage(dataUrl: string): Promise<string> {
   return uploadBytesToStorage(imageBytes, mimeType);
 }
 
-async function downloadRemoteImageToStorage(
-  remoteUrl: string,
-  prompt: string,
-  visualMode: VisualMode,
-  context?: string,
-  extraHeaders?: Record<string, string>,
-): Promise<string | null> {
-  try {
-    const imageResponse = await fetch(remoteUrl, {
-      headers: extraHeaders,
-    });
-
-    if (!imageResponse.ok) return null;
-
-    const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-    if (!contentType.startsWith("image/")) return null;
-
-    const bytes = new Uint8Array(await imageResponse.arrayBuffer());
-    if (!bytes.byteLength) return null;
-
-    const uploadedUrl = await uploadBytesToStorage(bytes, contentType);
-    if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
-      return uploadedUrl;
-    }
-  } catch (e) {
-    console.error("[generate-image] Remote image download failed:", e);
-  }
-
-  return null;
-}
-
 async function generateWithLovableGateway(apiKey: string, prompt: string, preset: ModelPreset, visualMode: VisualMode, context?: string): Promise<string | null> {
   for (const model of MODEL_MAP[preset].gateway) {
     console.log(`[generate-image] Trying Lovable gateway: ${model}`);
@@ -522,9 +491,25 @@ async function generateWithPollinations(prompt: string, visualMode: VisualMode, 
     const seed = Math.floor(Math.random() * 100000);
     const remoteUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=768&nologo=true&enhance=true&model=flux&seed=${seed}`;
 
-    return await downloadRemoteImageToStorage(remoteUrl, prompt, visualMode, context, {
-      Accept: "image/png,image/jpeg,image/webp,*/*",
+    const imageResponse = await fetch(remoteUrl, {
+      headers: { Accept: "image/png,image/jpeg,image/webp,*/*" },
     });
+
+    if (!imageResponse.ok) {
+      console.error(`[generate-image] Pollinations fetch failed: ${imageResponse.status}`);
+      return null;
+    }
+
+    const contentType = imageResponse.headers.get("content-type") || "image/png";
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    if (!arrayBuffer.byteLength) {
+      console.error("[generate-image] Pollinations returned empty body");
+      return null;
+    }
+
+    const publicUrl = await uploadBytesToStorage(new Uint8Array(arrayBuffer), contentType);
+    console.log("[generate-image] Pollinations image fetched and uploaded");
+    return publicUrl;
   } catch (e) {
     console.error("[generate-image] Pollinations error:", e);
     return null;
@@ -588,46 +573,28 @@ async function generateWithWikimediaCommons(prompt: string, visualMode: VisualMo
       .filter((url) => /\.(png|jpe?g|webp)$/i.test(url));
 
     for (const remoteUrl of urls) {
-      const result = await downloadRemoteImageToStorage(remoteUrl, prompt, visualMode, context, {
-        "User-Agent": "LovableResearchImageBot/1.0 (https://lovable.dev)",
+      const imageResponse = await fetch(remoteUrl, {
+        headers: { "User-Agent": "LovableResearchImageBot/1.0 (https://lovable.dev)" },
       });
-      if (result) return result;
+
+      if (!imageResponse.ok) continue;
+
+      const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+      if (!contentType.startsWith("image/")) continue;
+
+      const bytes = new Uint8Array(await imageResponse.arrayBuffer());
+      if (!bytes.byteLength) continue;
+
+      const uploadedUrl = await uploadBytesToStorage(bytes, contentType);
+      if (await validateGeneratedImage(uploadedUrl, prompt, visualMode, context)) {
+        return uploadedUrl;
+      }
     }
   } catch (e) {
     console.error("[generate-image] Wikimedia fallback error:", e);
   }
 
   return null;
-}
-
-async function generateWithUnsplashSource(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  if (visualMode !== "photo") return null;
-  console.log("[generate-image] Using Unsplash Source fallback");
-  const query = encodeURIComponent(buildWikimediaSearchQuery(prompt, context, visualMode));
-  const remoteUrl = `https://source.unsplash.com/1600x900/?${query}`;
-  return await downloadRemoteImageToStorage(remoteUrl, prompt, visualMode, context);
-}
-
-async function generateWithLoremFlickr(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  if (visualMode !== "photo") return null;
-  console.log("[generate-image] Using LoremFlickr fallback");
-  const query = encodeURIComponent(buildWikimediaSearchQuery(prompt, context, visualMode).replace(/\s+/g, ","));
-  const remoteUrl = `https://loremflickr.com/1600/900/${query}/all`;
-  return await downloadRemoteImageToStorage(remoteUrl, prompt, visualMode, context);
-}
-
-async function generateWithPicsum(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  if (visualMode !== "photo") return null;
-  console.log("[generate-image] Using Picsum fallback");
-  const remoteUrl = `https://picsum.photos/seed/${encodeURIComponent(prompt.slice(0, 80))}/1600/900`;
-  return await downloadRemoteImageToStorage(remoteUrl, prompt, visualMode, context);
-}
-
-async function generateWithPlaceholdNature(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
-  if (visualMode !== "photo") return null;
-  console.log("[generate-image] Using Placehold fallback");
-  const remoteUrl = "https://placehold.co/1600x900/png";
-  return await downloadRemoteImageToStorage(remoteUrl, prompt, visualMode, context);
 }
 
 async function generateWithTogetherAI(prompt: string, visualMode: VisualMode, context?: string): Promise<string | null> {
@@ -752,27 +719,7 @@ serve(async (req) => {
     }
 
     if (!imageUrl) {
-      imageUrl = await generateWithUnsplashSource(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "unsplash-source";
-    }
-
-    if (!imageUrl) {
-      imageUrl = await generateWithLoremFlickr(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "loremflickr";
-    }
-
-    if (!imageUrl) {
-      imageUrl = await generateWithPicsum(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "picsum";
-    }
-
-    if (!imageUrl) {
-      imageUrl = await generateWithPlaceholdNature(finalPrompt, visualMode, finalContext);
-      if (imageUrl) usedModel = "placehold";
-    }
-
-    if (!imageUrl) {
-      return new Response(JSON.stringify({ error: "Image generation failed after trying all configured providers, including 5+ free fallbacks." }), {
+      return new Response(JSON.stringify({ error: "High-quality image generation failed. The premium providers are temporarily unavailable or out of quota." }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

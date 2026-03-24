@@ -110,40 +110,13 @@ async function callAI(
   throw new Error('All AI attempts failed');
 }
 
-/** Strip markdown code fences and fix malformed HTML from fallback providers */
+/** Strip markdown code fences from AI output */
 function cleanHtmlOutput(text: string): string {
-  let cleaned = text
+  return text
     .replace(/^```html\s*/gi, '')
     .replace(/^```\s*/gm, '')
     .replace(/```\s*$/g, '')
     .trim();
-
-  // Fix stripped heading tags: <1> → <h1>, </1> → </h1>, etc.
-  cleaned = cleaned.replace(/<(\/?)(1|2|3|4|5|6)>/g, '<$1h$2>');
-
-  // Fix malformed table tags: <head> → <thead>, <body> → <tbody>
-  cleaned = cleaned.replace(/<head>/g, '<thead>').replace(/<\/head>/g, '</thead>');
-  cleaned = cleaned.replace(/<body>/g, '<tbody>').replace(/<\/body>/g, '</tbody>');
-  // Fix unclosed/swapped table tags like <tr><thead> → </tr></thead>
-  cleaned = cleaned.replace(/<tr><thead>/g, '</tr></thead>');
-  cleaned = cleaned.replace(/<tr><tbody>/g, '</tr></tbody>');
-
-  // Fix markdown-style bullets to HTML lists
-  // Match consecutive lines starting with * or -
-  cleaned = cleaned.replace(/(<p>)?\s*(?:\*|-)\s+(.+?)(?:<\/p>)?(?:\n|<br\/?>)?/g, '<li>$2</li>');
-  // Wrap consecutive <li> items in <ul>
-  cleaned = cleaned.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>');
-  // Clean double-wrapped
-  cleaned = cleaned.replace(/<ul>\s*<ul>/g, '<ul>').replace(/<\/ul>\s*<\/ul>/g, '</ul>');
-
-  // Fix figure captions that use <figure> instead of <p>
-  cleaned = cleaned.replace(/<figure\s+class="figure-caption"/g, '<p class="figure-caption"');
-  cleaned = cleaned.replace(/<\/figure>/g, '</p>');
-  // Fix unclosed <p> in figure captions
-  cleaned = cleaned.replace(/\]<p>\s*$/gm, ']</p>');
-  cleaned = cleaned.replace(/\]<p>\n/g, ']</p>\n');
-
-  return cleaned;
 }
 
 export async function generateResearch({ project, lang, onProgress, t }: GenerateParams): Promise<Record<string, string>> {
