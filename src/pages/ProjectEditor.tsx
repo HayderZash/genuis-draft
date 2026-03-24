@@ -39,6 +39,7 @@ export interface ProjectData {
   include_data_tables: boolean;
   image_quality: string;
   project_type: string;
+  include_abbreviations: boolean;
 }
 
 const ProjectEditor = () => {
