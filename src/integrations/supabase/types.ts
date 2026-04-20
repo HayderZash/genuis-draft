@@ -89,6 +89,51 @@ export type Database = {
         }
         Relationships: []
       }
+      exam_papers: {
+        Row: {
+          created_at: string
+          difficulty: string
+          generated_questions: Json
+          id: string
+          language: string
+          question_count: number
+          question_types: Json
+          source_text: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string
+          generated_questions?: Json
+          id?: string
+          language?: string
+          question_count?: number
+          question_types?: Json
+          source_text?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          generated_questions?: Json
+          id?: string
+          language?: string
+          question_count?: number
+          question_types?: Json
+          source_text?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generated_images: {
         Row: {
           created_at: string
@@ -333,6 +378,108 @@ export type Database = {
           status?: string
           text_direction?: string
           title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      theses: {
+        Row: {
+          abstract: string
+          chapter_count: number
+          chapter_pages: Json
+          chapters: Json
+          content: Json
+          created_at: string
+          custom_references: string | null
+          field_of_study: string
+          id: string
+          image_quality: string
+          include_abbreviations: boolean
+          include_data_tables: boolean
+          include_images: boolean
+          include_list_of_figures: boolean
+          include_list_of_tables: boolean
+          include_toc: boolean
+          margin_bottom: number
+          margin_left: number
+          margin_right: number
+          margin_top: number
+          reference_count: number
+          research_language: string
+          source_files: Json | null
+          status: string
+          supervisor: string
+          text_direction: string
+          thesis_type: string
+          title: string
+          university: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          abstract?: string
+          chapter_count?: number
+          chapter_pages?: Json
+          chapters?: Json
+          content?: Json
+          created_at?: string
+          custom_references?: string | null
+          field_of_study?: string
+          id?: string
+          image_quality?: string
+          include_abbreviations?: boolean
+          include_data_tables?: boolean
+          include_images?: boolean
+          include_list_of_figures?: boolean
+          include_list_of_tables?: boolean
+          include_toc?: boolean
+          margin_bottom?: number
+          margin_left?: number
+          margin_right?: number
+          margin_top?: number
+          reference_count?: number
+          research_language?: string
+          source_files?: Json | null
+          status?: string
+          supervisor?: string
+          text_direction?: string
+          thesis_type?: string
+          title?: string
+          university?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          abstract?: string
+          chapter_count?: number
+          chapter_pages?: Json
+          chapters?: Json
+          content?: Json
+          created_at?: string
+          custom_references?: string | null
+          field_of_study?: string
+          id?: string
+          image_quality?: string
+          include_abbreviations?: boolean
+          include_data_tables?: boolean
+          include_images?: boolean
+          include_list_of_figures?: boolean
+          include_list_of_tables?: boolean
+          include_toc?: boolean
+          margin_bottom?: number
+          margin_left?: number
+          margin_right?: number
+          margin_top?: number
+          reference_count?: number
+          research_language?: string
+          source_files?: Json | null
+          status?: string
+          supervisor?: string
+          text_direction?: string
+          thesis_type?: string
+          title?: string
+          university?: string
           updated_at?: string
           user_id?: string
         }
