@@ -21,6 +21,7 @@ import AIAssistant from "./pages/AIAssistant";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
 import ExamExpert from "./pages/ExamExpert";
+import Theses from "./pages/Theses";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const AppRoutes = () => {
       <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
       <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
       <Route path="/exam-expert" element={<ProtectedRoute><ExamExpert /></ProtectedRoute>} />
+      <Route path="/theses" element={<ProtectedRoute><Theses /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       {/* Legacy redirects */}
       <Route path="/plagiarism" element={<Navigate to="/proofreading" replace />} />
