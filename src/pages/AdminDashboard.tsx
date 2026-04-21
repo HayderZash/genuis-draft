@@ -18,12 +18,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 const FEATURES = [
   { key: 'research', ar: 'البحوث الأكاديمية', en: 'Academic Research', cost: 2 },
+  { key: 'thesis', ar: 'رسائل الدراسات العليا', en: 'Graduate Theses', cost: 5 },
   { key: 'reports', ar: 'التقارير', en: 'Reports', cost: 1 },
   { key: 'cv', ar: 'السيرة الذاتية', en: 'CV Builder', cost: 0.5 },
-  { key: 'proofreading', ar: 'التدقيق اللغوي', en: 'Proofreading', cost: 0.5 },
+  { key: 'proofreading', ar: 'التدقيق والكشف الأكاديمي', en: 'Academic Proofreading & Plagiarism', cost: 0.5 },
+  { key: 'exam_expert', ar: 'خبير الامتحانات', en: 'Exam Expert', cost: 0.01 },
   { key: 'translator', ar: 'الترجمة', en: 'Translation', cost: 0 },
   { key: 'summarizer', ar: 'التلخيص', en: 'Summarizer', cost: 0.25 },
-  { key: 'plagiarism', ar: 'كشف الاستلال', en: 'Plagiarism Detection', cost: 0.5 },
 ];
 
 interface ManagedUser {

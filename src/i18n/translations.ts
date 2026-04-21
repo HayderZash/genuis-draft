@@ -39,10 +39,11 @@ export const translations = {
   summarizeTextDesc: { ar: 'تلخيص النصوص الطويلة بالذكاء الاصطناعي', en: 'AI-powered summarization of long texts' },
   academicTranslation: { ar: 'الترجمة الأكاديمية', en: 'Academic Translation' },
   academicTranslationDesc: { ar: 'ترجمة نصوص أكاديمية بين العربية والإنجليزية', en: 'Translate academic texts between Arabic and English' },
-  imageGenerator: { ar: 'مولد الصور الاحترافية', en: 'Image Generator' },
-  imageGeneratorDesc: { ar: 'إنشاء صور احترافية بالذكاء الاصطناعي', en: 'Generate professional AI images' },
-  plagiarismChecker: { ar: 'كشف نسبة الاستلال', en: 'Plagiarism Detection' },
-  plagiarismCheckerDesc: { ar: 'فحص النصوص والتأكد من أصالتها ونسبة التطابق', en: 'Check texts for originality and similarity percentage' },
+  graduateTheses: { ar: 'رسائل الدراسات العليا', en: 'Graduate Theses' },
+  graduateThesesDesc: { ar: 'رسائل ماجستير ودكتوراه بمنهجية بحثية ومصادر معتمدة', en: 'Master & PhD theses with research methodology and verified sources' },
+  examExpert: { ar: 'خبير الامتحانات', en: 'Exam Expert' },
+  examExpertDesc: { ar: 'توليد أسئلة امتحانية أكاديمية متنوعة من أي محتوى', en: 'Generate diverse academic exam questions from any content' },
+  academicProofreadingPlagiarism: { ar: 'التدقيق والكشف الأكاديمي', en: 'Academic Proofreading & Plagiarism' },
 
   // Settings
   aiProvider: { ar: 'مزود الذكاء الاصطناعي', en: 'AI Provider' },

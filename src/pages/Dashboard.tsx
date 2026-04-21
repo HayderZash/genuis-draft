@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle,
   BookOpen, Languages, Bot, ShieldCheck, ImageIcon, Search,
-  Sparkles, ArrowUpRight, Zap, LayoutGrid
+  Sparkles, ArrowUpRight, Zap, LayoutGrid, GraduationCap, ClipboardList
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { PointsPanel } from '@/components/PointsPanel';
@@ -18,7 +18,7 @@ import { PointsPanel } from '@/components/PointsPanel';
 interface CompletedItem {
   id: string;
   title: string;
-  type: 'research' | 'report' | 'cv' | 'image';
+  type: 'research' | 'report' | 'cv' | 'thesis';
   status: string;
   created_at: string;
 }
@@ -36,13 +36,13 @@ const FEATURE_COLORS = [
 
 const FEATURE_DESCRIPTIONS: Record<string, { ar: string; en: string }> = {
   research: { ar: 'بحوث أكاديمية مع فصول ومراجع وتنسيق كامل بضغطة واحدة', en: 'Full academic research with chapters, references and formatting in one click' },
-  proofreading: { ar: 'تصحيح الأخطاء الإملائية والنحوية مع اقتراحات تحسين', en: 'Fix spelling and grammar errors with improvement suggestions' },
+  proofreading: { ar: 'تدقيق لغوي وكشف نسبة الاستلال في أداة موحدة', en: 'Linguistic proofreading and plagiarism detection in one tool' },
   report: { ar: 'تقارير علمية ومختبرية احترافية جاهزة للطباعة', en: 'Professional scientific and lab reports ready to print' },
   cv: { ar: 'سيرة ذاتية احترافية تناسب سوق العمل الحديث', en: 'Professional CV that fits the modern job market' },
   summarize: { ar: 'تلخيص نصوص طويلة مع الحفاظ على الأفكار الرئيسية', en: 'Summarize long texts while keeping key ideas' },
   translate: { ar: 'ترجمة أكاديمية دقيقة مع مراعاة المصطلحات المتخصصة', en: 'Precise academic translation with specialized terminology' },
-  'image-gen': { ar: 'توليد صور دقيقة ومطابقة للوصف بالذكاء الاصطناعي', en: 'Generate precise AI images matching your description' },
-  plagiarism: { ar: 'فحص النصوص لكشف نسبة التشابه مع المصادر الأخرى', en: 'Check texts for similarity with other sources' },
+  thesis: { ar: 'رسائل ماجستير ودكتوراه بمنهجية بحثية ومصادر معتمدة', en: 'Master & PhD theses with research methodology and verified sources' },
+  exam: { ar: 'توليد أسئلة امتحانية أكاديمية متنوعة من أي محتوى', en: 'Generate diverse academic exam questions from any content' },
 };
 
 const Dashboard = () => {
@@ -55,18 +55,18 @@ const Dashboard = () => {
   const [flippedCard, setFlippedCard] = useState<string | null>(null);
 
   const fetchAllItems = async () => {
-    const [researchRes, reportsRes, cvsRes, imagesRes] = await Promise.all([
+    const [researchRes, reportsRes, cvsRes, thesesRes] = await Promise.all([
       supabase.from('research_projects').select('id, title, status, created_at').order('updated_at', { ascending: false }),
       supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false }),
       supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false }),
-      supabase.from('generated_images').select('id, prompt, created_at').order('created_at', { ascending: false }).limit(20),
+      supabase.from('theses').select('id, title, status, created_at').order('updated_at', { ascending: false }),
     ]);
 
     const allItems: CompletedItem[] = [];
     if (researchRes.data) researchRes.data.forEach(p => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at }));
     if (reportsRes.data) reportsRes.data.forEach(r => allItems.push({ id: r.id, title: r.title || (lang === 'ar' ? 'تقرير جديد' : 'New Report'), type: 'report', status: r.status, created_at: r.created_at }));
     if (cvsRes.data) cvsRes.data.forEach(c => allItems.push({ id: c.id, title: c.full_name || (lang === 'ar' ? 'سيرة ذاتية' : 'CV'), type: 'cv', status: c.status, created_at: c.created_at }));
-    if (imagesRes.data) imagesRes.data.forEach(img => allItems.push({ id: img.id, title: img.prompt || (lang === 'ar' ? 'صورة مولدة' : 'Generated Image'), type: 'image', status: 'completed', created_at: img.created_at }));
+    if (thesesRes.data) thesesRes.data.forEach(th => allItems.push({ id: th.id, title: th.title || (lang === 'ar' ? 'رسالة جديدة' : 'New Thesis'), type: 'thesis' as any, status: th.status, created_at: th.created_at }));
 
     allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setItems(allItems);
@@ -78,7 +78,7 @@ const Dashboard = () => {
   const deleteItem = async (item: CompletedItem) => {
     if (item.type === 'research') await supabase.from('research_projects').delete().eq('id', item.id);
     else if (item.type === 'report') await supabase.from('reports').delete().eq('id', item.id);
-    else if (item.type === 'image') await supabase.from('generated_images').delete().eq('id', item.id);
+    else if ((item.type as any) === 'thesis') await supabase.from('theses').delete().eq('id', item.id);
     else await supabase.from('cvs').delete().eq('id', item.id);
     setItems(prev => prev.filter(i => !(i.id === item.id && i.type === item.type)));
   };
@@ -86,8 +86,7 @@ const Dashboard = () => {
   const openItem = (item: CompletedItem) => {
     if (item.type === 'research') navigate(`/project/${item.id}`);
     else if (item.type === 'report') navigate('/reports');
-    else if (item.type === 'image') navigate('/image-generator');
-    else navigate('/cvs');
+    else if (item.type === 'cv') navigate('/cvs');
   };
 
   const typeLabel = (type: string) => {
@@ -95,7 +94,7 @@ const Dashboard = () => {
       research: { ar: 'بحث أكاديمي', en: 'Research' },
       report: { ar: 'تقرير', en: 'Report' },
       cv: { ar: 'سيرة ذاتية', en: 'CV' },
-      image: { ar: 'صورة مولدة', en: 'Image' },
+      thesis: { ar: 'رسالة دراسات عليا', en: 'Thesis' },
     };
     return labels[type]?.[lang] || type;
   };
@@ -104,13 +103,13 @@ const Dashboard = () => {
 
   const features = [
     { key: 'research', icon: FileText, title: lang === 'ar' ? 'البحوث الأكاديمية' : 'Academic Research', onClick: () => navigate('/research') },
-    { key: 'proofreading', icon: CheckCircle, title: lang === 'ar' ? 'التدقيق اللغوي' : 'Proofreading', onClick: () => navigate('/proofreading') },
+    { key: 'thesis', icon: GraduationCap, title: lang === 'ar' ? 'رسائل الدراسات العليا' : 'Graduate Theses', onClick: () => navigate('/theses') },
     { key: 'report', icon: FileSpreadsheet, title: lang === 'ar' ? 'التقارير العلمية' : 'Scientific Reports', onClick: () => navigate('/reports') },
+    { key: 'exam', icon: ClipboardList, title: lang === 'ar' ? 'خبير الامتحانات' : 'Exam Expert', onClick: () => navigate('/exam-expert') },
+    { key: 'proofreading', icon: ShieldCheck, title: lang === 'ar' ? 'التدقيق والكشف الأكاديمي' : 'Academic Proofreading & Plagiarism', onClick: () => navigate('/proofreading') },
     { key: 'cv', icon: UserCircle, title: lang === 'ar' ? 'السيرة الذاتية' : 'CV Builder', onClick: () => navigate('/cvs') },
     { key: 'summarize', icon: BookOpen, title: lang === 'ar' ? 'تلخيص النصوص' : 'Summarizer', onClick: () => navigate('/summarizer') },
     { key: 'translate', icon: Languages, title: lang === 'ar' ? 'الترجمة الأكاديمية' : 'Translation', onClick: () => navigate('/translator') },
-    { key: 'image-gen', icon: ImageIcon, title: lang === 'ar' ? 'مولد الصور' : 'Image Generator', onClick: () => navigate('/image-generator') },
-    { key: 'plagiarism', icon: ShieldCheck, title: lang === 'ar' ? 'كشف الاستلال' : 'Plagiarism Detection', onClick: () => navigate('/plagiarism') },
   ];
 
   const filteredItems = items.filter(item =>

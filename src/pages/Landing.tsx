@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   FileText, CheckCircle, FileSpreadsheet, UserCircle,
-  BookOpen, Languages, ShieldCheck, ImageIcon,
+  BookOpen, Languages, ShieldCheck, ClipboardList,
   MessageCircle, Send, Instagram, GraduationCap, Sparkles, ArrowRight
 } from 'lucide-react';
 
@@ -40,13 +40,13 @@ const Landing = () => {
 
   const features = [
     { icon: FileText, title: isAr ? 'البحوث الأكاديمية' : 'Academic Research', desc: isAr ? 'توليد بحوث تخرج كاملة بالذكاء الاصطناعي مع المراجع والتنسيق الأكاديمي' : 'AI-powered full graduation research with references and academic formatting', color: 'text-blue-600' },
-    { icon: CheckCircle, title: isAr ? 'التدقيق اللغوي' : 'Proofreading', desc: isAr ? 'تدقيق لغوي شامل للنصوص الأكاديمية مع تصحيح الأخطاء النحوية والإملائية' : 'Comprehensive linguistic proofreading with grammar and spelling corrections', color: 'text-emerald-600' },
+    { icon: GraduationCap, title: isAr ? 'رسائل الدراسات العليا' : 'Graduate Theses', desc: isAr ? 'كتابة رسائل الماجستير والدكتوراه بمنهجية بحثية ومصادر معتمدة' : 'Master & PhD theses with research methodology and verified sources', color: 'text-indigo-600' },
+    { icon: ShieldCheck, title: isAr ? 'التدقيق والكشف الأكاديمي' : 'Academic Proofreading & Plagiarism', desc: isAr ? 'تدقيق لغوي شامل + كشف نسبة الاستلال في أداة موحدة' : 'Linguistic proofreading + plagiarism detection in one tool', color: 'text-emerald-600' },
     { icon: FileSpreadsheet, title: isAr ? 'التقارير العلمية' : 'Scientific Reports', desc: isAr ? 'إنشاء تقارير علمية ومختبرية احترافية جاهزة للتسليم' : 'Create professional scientific and lab reports ready for submission', color: 'text-amber-600' },
+    { icon: ClipboardList, title: isAr ? 'خبير الامتحانات' : 'Exam Expert', desc: isAr ? 'توليد أسئلة امتحانية أكاديمية متنوعة من أي محتوى أو محاضرة' : 'Generate diverse academic exam questions from any content or lecture', color: 'text-orange-600' },
     { icon: UserCircle, title: isAr ? 'السيرة الذاتية' : 'CV Builder', desc: isAr ? 'إنشاء سيرة ذاتية احترافية متوافقة مع أنظمة ATS الحديثة' : 'Build professional ATS-compatible CVs', color: 'text-violet-600' },
     { icon: BookOpen, title: isAr ? 'تلخيص النصوص' : 'Text Summarizer', desc: isAr ? 'تلخيص النصوص الطويلة والأبحاث بشكل ذكي ومختصر' : 'Smart summarization of long texts and research papers', color: 'text-cyan-600' },
     { icon: Languages, title: isAr ? 'الترجمة الأكاديمية' : 'Academic Translation', desc: isAr ? 'ترجمة أكاديمية دقيقة بين العربية والإنجليزية' : 'Precise academic translation between Arabic and English', color: 'text-rose-600' },
-    { icon: ImageIcon, title: isAr ? 'مولد الصور الاحترافية' : 'Image Generator', desc: isAr ? 'إنشاء صور احترافية بالذكاء الاصطناعي لمشاريعك' : 'Generate professional AI images for your projects', color: 'text-orange-600' },
-    { icon: ShieldCheck, title: isAr ? 'كشف نسبة الاستلال' : 'Plagiarism Detection', desc: isAr ? 'فحص النصوص وكشف نسبة الاستلال بدقة عالية' : 'Check texts and detect plagiarism percentage accurately', color: 'text-teal-600' },
   ];
 
   return (
