@@ -74,7 +74,7 @@ const ExamExpert = () => {
       toast({ title: lang === 'ar' ? 'أكمل جميع الحقول' : 'Complete all fields', variant: 'destructive' });
       return;
     }
-    const cost = +(count * 0.01).toFixed(2);
+    // Cost is enforced server-side via checkAndConsume; here we display only.
     const allowed = await checkAndConsume('exam_expert', lang);
     if (!allowed) return;
 
