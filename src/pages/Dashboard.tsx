@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle,
   BookOpen, Languages, Bot, ShieldCheck, ImageIcon, Search,
-  Sparkles, ArrowUpRight, Zap, LayoutGrid
+  Sparkles, ArrowUpRight, Zap, LayoutGrid, GraduationCap, ClipboardList
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { PointsPanel } from '@/components/PointsPanel';
