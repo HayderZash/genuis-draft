@@ -36,13 +36,13 @@ const FEATURE_COLORS = [
 
 const FEATURE_DESCRIPTIONS: Record<string, { ar: string; en: string }> = {
   research: { ar: 'بحوث أكاديمية مع فصول ومراجع وتنسيق كامل بضغطة واحدة', en: 'Full academic research with chapters, references and formatting in one click' },
-  proofreading: { ar: 'تصحيح الأخطاء الإملائية والنحوية مع اقتراحات تحسين', en: 'Fix spelling and grammar errors with improvement suggestions' },
+  proofreading: { ar: 'تدقيق لغوي وكشف نسبة الاستلال في أداة موحدة', en: 'Linguistic proofreading and plagiarism detection in one tool' },
   report: { ar: 'تقارير علمية ومختبرية احترافية جاهزة للطباعة', en: 'Professional scientific and lab reports ready to print' },
   cv: { ar: 'سيرة ذاتية احترافية تناسب سوق العمل الحديث', en: 'Professional CV that fits the modern job market' },
   summarize: { ar: 'تلخيص نصوص طويلة مع الحفاظ على الأفكار الرئيسية', en: 'Summarize long texts while keeping key ideas' },
   translate: { ar: 'ترجمة أكاديمية دقيقة مع مراعاة المصطلحات المتخصصة', en: 'Precise academic translation with specialized terminology' },
-  'image-gen': { ar: 'توليد صور دقيقة ومطابقة للوصف بالذكاء الاصطناعي', en: 'Generate precise AI images matching your description' },
-  plagiarism: { ar: 'فحص النصوص لكشف نسبة التشابه مع المصادر الأخرى', en: 'Check texts for similarity with other sources' },
+  thesis: { ar: 'رسائل ماجستير ودكتوراه بمنهجية بحثية ومصادر معتمدة', en: 'Master & PhD theses with research methodology and verified sources' },
+  exam: { ar: 'توليد أسئلة امتحانية أكاديمية متنوعة من أي محتوى', en: 'Generate diverse academic exam questions from any content' },
 };
 
 const Dashboard = () => {
