@@ -17,11 +17,10 @@ import CVBuilder from "./pages/CVBuilder";
 import ResearchList from "./pages/ResearchList";
 import Summarizer from "./pages/Summarizer";
 import Translator from "./pages/Translator";
-import PlagiarismChecker from "./pages/PlagiarismChecker";
 import AIAssistant from "./pages/AIAssistant";
-import ImageGenerator from "./pages/ImageGenerator";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/AdminDashboard";
+import ExamExpert from "./pages/ExamExpert";
 
 const queryClient = new QueryClient();
 
@@ -49,10 +48,12 @@ const AppRoutes = () => {
       <Route path="/cvs" element={<ProtectedRoute><CVBuilder /></ProtectedRoute>} />
       <Route path="/summarizer" element={<ProtectedRoute><Summarizer /></ProtectedRoute>} />
       <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
-      <Route path="/plagiarism" element={<ProtectedRoute><PlagiarismChecker /></ProtectedRoute>} />
       <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
-      <Route path="/image-generator" element={<ProtectedRoute><ImageGenerator /></ProtectedRoute>} />
+      <Route path="/exam-expert" element={<ProtectedRoute><ExamExpert /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+      {/* Legacy redirects */}
+      <Route path="/plagiarism" element={<Navigate to="/proofreading" replace />} />
+      <Route path="/image-generator" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
     {showNavbar && <FloatingAIAssistant />}

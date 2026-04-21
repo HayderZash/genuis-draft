@@ -4,13 +4,13 @@ import { toast } from '@/hooks/use-toast';
 
 const FEATURE_COSTS: Record<string, number> = {
   research: 2,
+  thesis: 5,
   reports: 1,
   cv: 0.5,
   proofreading: 0.5,
   translator: 0,
   summarizer: 0.25,
-  plagiarism: 0.5,
-  'image-gen': 0.1,
+  exam_expert: 0.01, // per-question; for 10 questions UI shows 0.1
 };
 
 export const useFeatureAccess = () => {
