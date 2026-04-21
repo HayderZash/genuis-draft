@@ -104,13 +104,13 @@ const Dashboard = () => {
 
   const features = [
     { key: 'research', icon: FileText, title: lang === 'ar' ? 'البحوث الأكاديمية' : 'Academic Research', onClick: () => navigate('/research') },
-    { key: 'proofreading', icon: CheckCircle, title: lang === 'ar' ? 'التدقيق اللغوي' : 'Proofreading', onClick: () => navigate('/proofreading') },
+    { key: 'thesis', icon: GraduationCap, title: lang === 'ar' ? 'رسائل الدراسات العليا' : 'Graduate Theses', onClick: () => navigate('/theses') },
     { key: 'report', icon: FileSpreadsheet, title: lang === 'ar' ? 'التقارير العلمية' : 'Scientific Reports', onClick: () => navigate('/reports') },
+    { key: 'exam', icon: ClipboardList, title: lang === 'ar' ? 'خبير الامتحانات' : 'Exam Expert', onClick: () => navigate('/exam-expert') },
+    { key: 'proofreading', icon: ShieldCheck, title: lang === 'ar' ? 'التدقيق والكشف الأكاديمي' : 'Academic Proofreading & Plagiarism', onClick: () => navigate('/proofreading') },
     { key: 'cv', icon: UserCircle, title: lang === 'ar' ? 'السيرة الذاتية' : 'CV Builder', onClick: () => navigate('/cvs') },
     { key: 'summarize', icon: BookOpen, title: lang === 'ar' ? 'تلخيص النصوص' : 'Summarizer', onClick: () => navigate('/summarizer') },
     { key: 'translate', icon: Languages, title: lang === 'ar' ? 'الترجمة الأكاديمية' : 'Translation', onClick: () => navigate('/translator') },
-    { key: 'image-gen', icon: ImageIcon, title: lang === 'ar' ? 'مولد الصور' : 'Image Generator', onClick: () => navigate('/image-generator') },
-    { key: 'plagiarism', icon: ShieldCheck, title: lang === 'ar' ? 'كشف الاستلال' : 'Plagiarism Detection', onClick: () => navigate('/plagiarism') },
   ];
 
   const filteredItems = items.filter(item =>
