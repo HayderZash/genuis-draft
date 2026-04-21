@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Loader2, Languages, Copy, ArrowRightLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getAssistantProviderPayload } from '@/lib/assistant-provider';
 
 const Translator = () => {
   const { t, lang } = useLanguage();
@@ -32,16 +33,47 @@ const Translator = () => {
       toast({ title: lang === 'ar' ? 'يرجى إدخال النص' : 'Please enter text', variant: 'destructive' });
       return;
     }
+
+    const { provider, apiKey } = getAssistantProviderPayload();
+    if (!provider || !apiKey) {
+      toast({
+        title: lang === 'ar' ? 'لم يتم ضبط مزود الذكاء الاصطناعي' : 'AI provider not configured',
+        description: lang === 'ar'
+          ? 'يرجى إضافة مفتاح API لأحد المزودين من الإعدادات قبل استخدام الترجمة.'
+          : 'Please add an API key for one of the providers in Settings before using translation.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     setTranslation('');
     try {
-      const { data, error } = await supabase.functions.invoke('translate', {
-        body: { text: text.trim(), sourceLanguage, targetLanguage },
+      const sourceName = sourceLanguage === 'ar' ? 'Arabic' : 'English';
+      const targetName = targetLanguage === 'ar' ? 'Arabic' : 'English';
+      const systemPrompt = `You are an expert academic translator. Translate the following text from ${sourceName} to ${targetName} with high precision. Maintain academic tone, terminology accuracy, and proper formatting. Preserve paragraph structure. Output ONLY the translated text, nothing else (no preface, no explanation, no quotes).`;
+
+      const { data, error } = await supabase.functions.invoke('ai-proxy', {
+        body: {
+          provider,
+          apiKey,
+          systemPrompt,
+          userPrompt: text.trim(),
+          maxTokens: 8000,
+          temperature: 0.2,
+        },
       });
       if (error) throw error;
-      setTranslation(data?.translation || '');
+      if (data?.error) throw new Error(data.error);
+      const out = (data?.content || '').trim();
+      if (!out) throw new Error(lang === 'ar' ? 'لم يتم استلام ترجمة' : 'No translation returned');
+      setTranslation(out);
     } catch (err: any) {
-      toast({ title: err.message || 'Error', variant: 'destructive' });
+      toast({
+        title: lang === 'ar' ? 'فشلت الترجمة' : 'Translation failed',
+        description: err?.message || 'Error',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
