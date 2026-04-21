@@ -14,17 +14,17 @@ interface FeaturePointInfo {
 
 const FEATURE_LABELS: Record<string, { ar: string; en: string }> = {
   research: { ar: 'البحوث الأكاديمية', en: 'Research' },
+  thesis: { ar: 'رسائل الدراسات العليا', en: 'Theses' },
   reports: { ar: 'التقارير', en: 'Reports' },
   cv: { ar: 'السيرة الذاتية', en: 'CV' },
-  proofreading: { ar: 'التدقيق اللغوي', en: 'Proofreading' },
+  proofreading: { ar: 'التدقيق والكشف الأكاديمي', en: 'Proofreading & Plagiarism' },
   summarizer: { ar: 'التلخيص', en: 'Summarizer' },
-  plagiarism: { ar: 'كشف الاستلال', en: 'Plagiarism' },
-  'image-gen': { ar: 'توليد الصور', en: 'Image Gen' },
+  exam_expert: { ar: 'خبير الامتحانات', en: 'Exam Expert' },
   translator: { ar: 'الترجمة (مجاني)', en: 'Translation (Free)' },
 };
 
 const FEATURE_COSTS: Record<string, number> = {
-  research: 2, reports: 1, cv: 0.5, proofreading: 0.5, summarizer: 0.25, plagiarism: 0.5, 'image-gen': 0.1, translator: 0,
+  research: 2, thesis: 5, reports: 1, cv: 0.5, proofreading: 0.5, summarizer: 0.25, exam_expert: 0.01, translator: 0,
 };
 
 export const PointsPanel = () => {

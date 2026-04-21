@@ -18,7 +18,7 @@ import { PointsPanel } from '@/components/PointsPanel';
 interface CompletedItem {
   id: string;
   title: string;
-  type: 'research' | 'report' | 'cv' | 'image';
+  type: 'research' | 'report' | 'cv' | 'thesis';
   status: string;
   created_at: string;
 }
@@ -55,18 +55,18 @@ const Dashboard = () => {
   const [flippedCard, setFlippedCard] = useState<string | null>(null);
 
   const fetchAllItems = async () => {
-    const [researchRes, reportsRes, cvsRes, imagesRes] = await Promise.all([
+    const [researchRes, reportsRes, cvsRes, thesesRes] = await Promise.all([
       supabase.from('research_projects').select('id, title, status, created_at').order('updated_at', { ascending: false }),
       supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false }),
       supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false }),
-      supabase.from('generated_images').select('id, prompt, created_at').order('created_at', { ascending: false }).limit(20),
+      supabase.from('theses').select('id, title, status, created_at').order('updated_at', { ascending: false }),
     ]);
 
     const allItems: CompletedItem[] = [];
     if (researchRes.data) researchRes.data.forEach(p => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at }));
     if (reportsRes.data) reportsRes.data.forEach(r => allItems.push({ id: r.id, title: r.title || (lang === 'ar' ? 'تقرير جديد' : 'New Report'), type: 'report', status: r.status, created_at: r.created_at }));
     if (cvsRes.data) cvsRes.data.forEach(c => allItems.push({ id: c.id, title: c.full_name || (lang === 'ar' ? 'سيرة ذاتية' : 'CV'), type: 'cv', status: c.status, created_at: c.created_at }));
-    if (imagesRes.data) imagesRes.data.forEach(img => allItems.push({ id: img.id, title: img.prompt || (lang === 'ar' ? 'صورة مولدة' : 'Generated Image'), type: 'image', status: 'completed', created_at: img.created_at }));
+    if (thesesRes.data) thesesRes.data.forEach(th => allItems.push({ id: th.id, title: th.title || (lang === 'ar' ? 'رسالة جديدة' : 'New Thesis'), type: 'thesis' as any, status: th.status, created_at: th.created_at }));
 
     allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     setItems(allItems);
@@ -78,7 +78,7 @@ const Dashboard = () => {
   const deleteItem = async (item: CompletedItem) => {
     if (item.type === 'research') await supabase.from('research_projects').delete().eq('id', item.id);
     else if (item.type === 'report') await supabase.from('reports').delete().eq('id', item.id);
-    else if (item.type === 'image') await supabase.from('generated_images').delete().eq('id', item.id);
+    else if ((item.type as any) === 'thesis') await supabase.from('theses').delete().eq('id', item.id);
     else await supabase.from('cvs').delete().eq('id', item.id);
     setItems(prev => prev.filter(i => !(i.id === item.id && i.type === item.type)));
   };
@@ -86,8 +86,7 @@ const Dashboard = () => {
   const openItem = (item: CompletedItem) => {
     if (item.type === 'research') navigate(`/project/${item.id}`);
     else if (item.type === 'report') navigate('/reports');
-    else if (item.type === 'image') navigate('/image-generator');
-    else navigate('/cvs');
+    else if (item.type === 'cv') navigate('/cvs');
   };
 
   const typeLabel = (type: string) => {
@@ -95,7 +94,7 @@ const Dashboard = () => {
       research: { ar: 'بحث أكاديمي', en: 'Research' },
       report: { ar: 'تقرير', en: 'Report' },
       cv: { ar: 'سيرة ذاتية', en: 'CV' },
-      image: { ar: 'صورة مولدة', en: 'Image' },
+      thesis: { ar: 'رسالة دراسات عليا', en: 'Thesis' },
     };
     return labels[type]?.[lang] || type;
   };
