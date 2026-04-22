@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Plus, FileText, Trash2, CheckCircle, FileSpreadsheet, UserCircle,
   BookOpen, Languages, Bot, ShieldCheck, ImageIcon, Search,
-  Sparkles, ArrowUpRight, Zap, LayoutGrid, GraduationCap, ClipboardList
+  Sparkles, ArrowUpRight, Zap, LayoutGrid, GraduationCap, ClipboardList, RefreshCw
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { PointsPanel } from '@/components/PointsPanel';
@@ -163,6 +163,10 @@ const Dashboard = () => {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={fetchAllItems} disabled={loading} className="gap-1.5">
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                {lang === 'ar' ? 'تحديث' : 'Refresh'}
+              </Button>
               <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">
                 <Zap className="h-3.5 w-3.5 text-primary" />
                 {lang === 'ar' ? `${items.length} مشروع` : `${items.length} projects`}
