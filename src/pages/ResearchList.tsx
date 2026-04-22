@@ -27,12 +27,28 @@ const ResearchList = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchProjects = async () => {
-    const { data } = await supabase
-      .from('research_projects')
-      .select('id, title, status, created_at')
-      .order('updated_at', { ascending: false });
-    if (data) setProjects(data);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 12000)
+      );
+      const queryPromise = supabase
+        .from('research_projects')
+        .select('id, title, status, created_at')
+        .order('updated_at', { ascending: false });
+      const result: any = await Promise.race([queryPromise, timeoutPromise]);
+      if (result?.data) setProjects(result.data);
+      else if (result?.error) {
+        toast({ title: result.error.message, variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({
+        title: lang === 'ar' ? 'تأخّر تحميل البحوث - حاول التحديث' : 'Loading research timed out - press refresh',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchProjects(); }, []);
