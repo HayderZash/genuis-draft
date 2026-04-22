@@ -19,17 +19,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Set up listener FIRST (synchronous handler — never put async work here)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // THEN check existing session, with stale-token recovery
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      })
+      .catch((err) => {
+        console.warn('[Auth] getSession failed, clearing stale token:', err?.message);
+        try {
+          Object.keys(localStorage)
+            .filter(k => k.startsWith('sb-') && k.includes('auth-token'))
+            .forEach(k => localStorage.removeItem(k));
+        } catch {}
+      })
+      .finally(() => setLoading(false));
 
     return () => subscription.unsubscribe();
   }, []);

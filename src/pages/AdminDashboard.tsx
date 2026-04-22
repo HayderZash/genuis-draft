@@ -109,14 +109,21 @@ const AdminDashboard = () => {
   };
 
   const fetchContactSettings = async () => {
-    const { data } = await supabase.from('platform_settings').select('key, value');
-    if (data) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('key, value')
+        .abortSignal(controller.signal);
+      clearTimeout(timer);
+      if (error || !data) return;
       data.forEach((s: any) => {
         if (s.key === 'contact_phone') setContactPhone(s.value);
         if (s.key === 'contact_telegram') setContactTelegram(s.value);
         if (s.key === 'contact_instagram') setContactInstagram(s.value);
       });
-    }
+    } catch { /* silent */ }
   };
 
   useEffect(() => {

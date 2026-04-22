@@ -23,16 +23,33 @@ const Landing = () => {
   }, [user, loading]);
 
   useEffect(() => {
+    // Cache contact info in localStorage to avoid blocking on slow/unavailable backend
+    const cached = localStorage.getItem('contact_info_cache');
+    if (cached) {
+      try { setContactInfo(JSON.parse(cached)); } catch {}
+    }
+
     const fetchContact = async () => {
-      const { data } = await supabase.from('platform_settings').select('key, value');
-      if (data) {
-        const map: any = {};
+      try {
+        // Hard timeout: never let this request block the UI for more than 5s
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        const { data, error } = await supabase
+          .from('platform_settings')
+          .select('key, value')
+          .abortSignal(controller.signal);
+        clearTimeout(timer);
+        if (error || !data) return;
+        const map: any = { whatsapp: '', telegram: '', instagram: '' };
         data.forEach((s: any) => {
           if (s.key === 'contact_phone') map.whatsapp = s.value;
           if (s.key === 'contact_telegram') map.telegram = s.value;
           if (s.key === 'contact_instagram') map.instagram = s.value;
         });
         setContactInfo(map);
+        localStorage.setItem('contact_info_cache', JSON.stringify(map));
+      } catch {
+        // Silent fail – cached or empty values are fine
       }
     };
     fetchContact();
