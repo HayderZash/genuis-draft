@@ -105,29 +105,32 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [mergeKeys, setMergeKeys] = useState<Record<AIProvider, string>>({} as any);
   const [showMergeKeys, setShowMergeKeys] = useState<Record<AIProvider, boolean>>({} as any);
 
+  // Load only ONCE when dialog opens; do NOT depend on syncToLocal (it changes every render and causes a reset loop that wipes typed input).
   useEffect(() => {
-    if (open) {
-      syncToLocal().then(() => {
-        const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
-        setProvider(savedProvider);
-        setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
-        setShowKey(false);
-
-        const merge = localStorage.getItem('ai_merge_mode') === 'true';
-        setMergeMode(merge);
-        setMergeProviders(JSON.parse(localStorage.getItem('ai_merge_providers') || '[]'));
-
-        const keys: Record<string, string> = {};
-        const shows: Record<string, boolean> = {};
-        ALL_PROVIDERS.forEach(p => {
-          keys[p.value] = localStorage.getItem(PROVIDER_KEY_MAP[p.value]) || '';
-          shows[p.value] = false;
-        });
-        setMergeKeys(keys as any);
-        setShowMergeKeys(shows as any);
+    if (!open) return;
+    let cancelled = false;
+    const load = async () => {
+      try { await syncToLocal(); } catch { /* ignore — fall back to localStorage */ }
+      if (cancelled) return;
+      const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+      setProvider(savedProvider);
+      setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
+      setShowKey(false);
+      setMergeMode(localStorage.getItem('ai_merge_mode') === 'true');
+      setMergeProviders(JSON.parse(localStorage.getItem('ai_merge_providers') || '[]'));
+      const keys: Record<string, string> = {};
+      const shows: Record<string, boolean> = {};
+      ALL_PROVIDERS.forEach(p => {
+        keys[p.value] = localStorage.getItem(PROVIDER_KEY_MAP[p.value]) || '';
+        shows[p.value] = false;
       });
-    }
-  }, [open, syncToLocal]);
+      setMergeKeys(keys as any);
+      setShowMergeKeys(shows as any);
+    };
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleProviderChange = (val: AIProvider) => {
     setProvider(val);
