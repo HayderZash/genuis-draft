@@ -209,10 +209,13 @@ serve(async (req) => {
           content = await callOpenAICompatible(spec, apiKey, systemPrompt, userPrompt, max, temp);
         }
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : "Unknown error";
+        const isAbort = e instanceof Error && (e.name === "AbortError" || /aborted/i.test(e.message));
+        const errMsg = isAbort
+          ? `Provider timeout after ${PROVIDER_TIMEOUT_MS / 1000}s`
+          : (e instanceof Error ? e.message : "Unknown error");
         console.error(`[ai-proxy] ${provider} error:`, errMsg);
         return new Response(JSON.stringify({ error: `${provider} error: ${errMsg}` }), {
-          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: isAbort ? 504 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
