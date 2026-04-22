@@ -135,6 +135,12 @@ const Dashboard = () => {
               <p className="text-muted-foreground text-lg max-w-xl">
                 {lang === 'ar' ? 'أدواتك الأكاديمية الذكية في مكان واحد — بحوث، تقارير، ترجمة والمزيد.' : 'Your smart academic tools in one place — research, reports, translation & more.'}
               </p>
+              {user?.email && (
+                <p className="text-xs text-muted-foreground/80 mt-2">
+                  {lang === 'ar' ? 'الحساب الحالي: ' : 'Logged in as: '}
+                  <span className="font-mono font-medium text-foreground/90">{user.email}</span>
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="gap-1.5 px-3 py-1.5 text-sm">

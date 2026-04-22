@@ -58,8 +58,22 @@ function getProviderSpec(provider: string): ProviderSpec | null {
   }
 }
 
+// Hard wall-clock timeout per provider call to prevent the UI from hanging for minutes
+// when an upstream API stalls. 90s is generous for long generations but fast enough to fail.
+const PROVIDER_TIMEOUT_MS = 90_000;
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = PROVIDER_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callOpenAICompatible(spec: ProviderSpec, apiKey: string, systemPrompt: string, userPrompt: string, maxTokens: number, temperature: number): Promise<string> {
-  const response = await fetch(spec.url, {
+  const response = await fetchWithTimeout(spec.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -79,7 +93,7 @@ async function callOpenAICompatible(spec: ProviderSpec, apiKey: string, systemPr
 
 async function callGemini(spec: ProviderSpec, apiKey: string, systemPrompt: string, userPrompt: string, maxTokens: number, temperature: number): Promise<string> {
   const url = `${spec.url}?key=${apiKey}`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -96,7 +110,7 @@ async function callGemini(spec: ProviderSpec, apiKey: string, systemPrompt: stri
 }
 
 async function callCohere(spec: ProviderSpec, apiKey: string, systemPrompt: string, userPrompt: string, maxTokens: number, temperature: number): Promise<string> {
-  const response = await fetch(spec.url, {
+  const response = await fetchWithTimeout(spec.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -142,7 +156,7 @@ serve(async (req) => {
         });
       }
       console.log("[ai-proxy] Using Lovable AI gateway");
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
