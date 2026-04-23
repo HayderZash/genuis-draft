@@ -21,12 +21,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+    let initResolved = false;
+
+    const finishLoading = () => {
+      if (!mounted) return;
+      initResolved = true;
+      setLoading(false);
+    };
 
     const applySession = (nextSession: Session | null) => {
       if (!mounted) return;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
-      setLoading(false);
+    };
+
+    const applyAndFinish = (nextSession: Session | null) => {
+      applySession(nextSession);
+      finishLoading();
     };
 
     const persistedSession = readStoredSession();
@@ -34,27 +45,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       applySession(persistedSession);
     }
 
+    const initTimer = window.setTimeout(() => {
+      if (!initResolved) finishLoading();
+    }, 1800);
+
     // Set up listener FIRST (synchronous handler — never put async work here)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      applyAndFinish(nextSession);
     });
 
     // THEN check existing session, with stale-token recovery
     supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        applySession(session);
+      .then(({ data: { session: nextSession } }) => {
+        applyAndFinish(nextSession);
       })
       .catch((err) => {
         console.warn('[Auth] getSession failed:', err?.message);
-        if (shouldClearStoredSession(err)) clearStoredAuthTokens();
-        applySession(null);
+        if (shouldClearStoredSession(err)) {
+          clearStoredAuthTokens();
+          applyAndFinish(null);
+          return;
+        }
+
+        applySession(persistedSession ?? null);
+        finishLoading();
       })
       .finally(() => {
-        if (!persistedSession) applySession(null);
+        window.clearTimeout(initTimer);
+        if (!initResolved && !persistedSession) {
+          applyAndFinish(null);
+        }
       });
 
     return () => {
       mounted = false;
+      window.clearTimeout(initTimer);
       subscription.unsubscribe();
     };
   }, []);
