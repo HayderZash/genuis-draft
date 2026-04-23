@@ -23,6 +23,13 @@ interface CompletedItem {
   created_at: string;
 }
 
+interface CachedResearchItem {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+}
+
 const FEATURE_COLORS = [
   { bg: 'from-blue-500/20 to-cyan-500/20', icon: 'text-blue-500', hover: 'group-hover:from-blue-500/30 group-hover:to-cyan-500/30', border: 'hover:border-blue-400/40' },
   { bg: 'from-emerald-500/20 to-green-500/20', icon: 'text-emerald-500', hover: 'group-hover:from-emerald-500/30 group-hover:to-green-500/30', border: 'hover:border-emerald-400/40' },
@@ -67,7 +74,7 @@ const Dashboard = () => {
       const cached = localStorage.getItem(researchCacheKey);
       if (cached) {
         try {
-          const parsed = JSON.parse(cached) as ResearchProject[];
+          const parsed = JSON.parse(cached) as CachedResearchItem[];
           const cachedItems = parsed.map((p: any) => ({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research' as const, status: p.status, created_at: p.created_at }));
           setItems(prev => {
             const nonResearch = prev.filter(item => item.type !== 'research');

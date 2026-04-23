@@ -134,6 +134,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
   const handleProviderChange = (val: AIProvider) => {
     setProvider(val);
+    localStorage.setItem('ai_provider', val);
     setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[val]) || '');
     setShowKey(false);
   };
@@ -257,7 +258,11 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                   <Input
                     type={showKey ? 'text' : 'password'}
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setApiKey(value);
+                        localStorage.setItem(PROVIDER_KEY_MAP[provider], value);
+                      }}
                     placeholder={ALL_PROVIDERS.find(p => p.value === provider)?.placeholder || ''}
                     className="pe-10"
                   />
