@@ -23,6 +23,13 @@ interface CompletedItem {
   created_at: string;
 }
 
+interface CachedResearchItem {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+}
+
 const FEATURE_COLORS = [
   { bg: 'from-blue-500/20 to-cyan-500/20', icon: 'text-blue-500', hover: 'group-hover:from-blue-500/30 group-hover:to-cyan-500/30', border: 'hover:border-blue-400/40' },
   { bg: 'from-emerald-500/20 to-green-500/20', icon: 'text-emerald-500', hover: 'group-hover:from-emerald-500/30 group-hover:to-green-500/30', border: 'hover:border-emerald-400/40' },
@@ -53,9 +60,33 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [flippedCard, setFlippedCard] = useState<string | null>(null);
+  const researchCacheKey = user ? `research_projects_cache_${user.id}` : null;
 
   const fetchAllItems = async () => {
+    if (!user) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    if (researchCacheKey) {
+      const cached = localStorage.getItem(researchCacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as CachedResearchItem[];
+          const cachedItems = parsed.map((p: any) => ({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research' as const, status: p.status, created_at: p.created_at }));
+          setItems(prev => {
+            const nonResearch = prev.filter(item => item.type !== 'research');
+            return [...cachedItems, ...nonResearch].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          });
+          setLoading(false);
+        } catch {
+          localStorage.removeItem(researchCacheKey);
+        }
+      }
+    }
+
     // Per-request timeout helper – never let one slow query block the dashboard
     const withTimeout = <T,>(p: PromiseLike<T>, ms = 12000): Promise<T> =>
       Promise.race([
@@ -65,7 +96,7 @@ const Dashboard = () => {
 
     // Use allSettled so one slow/failing table never wipes the others
     const [researchRes, reportsRes, cvsRes, thesesRes] = await Promise.allSettled([
-      withTimeout(supabase.from('research_projects').select('id, title, status, created_at').order('updated_at', { ascending: false })),
+      withTimeout(supabase.from('research_projects').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false })),
       withTimeout(supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false })),
       withTimeout(supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false })),
       withTimeout(supabase.from('theses').select('id, title, status, created_at').order('updated_at', { ascending: false })),
@@ -75,7 +106,7 @@ const Dashboard = () => {
     const pick = (res: any) => (res.status === 'fulfilled' ? res.value?.data : null);
     const failures: string[] = [];
 
-    const r = pick(researchRes); if (r) r.forEach((p: any) => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at })); else if (researchRes.status === 'rejected') failures.push('research');
+    const r = pick(researchRes); if (r) { r.forEach((p: any) => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at })); if (researchCacheKey) localStorage.setItem(researchCacheKey, JSON.stringify(r)); } else if (researchRes.status === 'rejected') failures.push('research');
     const rp = pick(reportsRes); if (rp) rp.forEach((x: any) => allItems.push({ id: x.id, title: x.title || (lang === 'ar' ? 'تقرير جديد' : 'New Report'), type: 'report', status: x.status, created_at: x.created_at })); else if (reportsRes.status === 'rejected') failures.push('reports');
     const cv = pick(cvsRes); if (cv) cv.forEach((c: any) => allItems.push({ id: c.id, title: c.full_name || (lang === 'ar' ? 'سيرة ذاتية' : 'CV'), type: 'cv', status: c.status, created_at: c.created_at })); else if (cvsRes.status === 'rejected') failures.push('cvs');
     const th = pick(thesesRes); if (th) th.forEach((t: any) => allItems.push({ id: t.id, title: t.title || (lang === 'ar' ? 'رسالة جديدة' : 'New Thesis'), type: 'thesis' as any, status: t.status, created_at: t.created_at })); else if (thesesRes.status === 'rejected') failures.push('theses');
@@ -93,7 +124,7 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => { fetchAllItems(); }, []);
+  useEffect(() => { fetchAllItems(); }, [user?.id]);
 
   const deleteItem = async (item: CompletedItem) => {
     if (item.type === 'research') await supabase.from('research_projects').delete().eq('id', item.id);

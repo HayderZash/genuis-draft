@@ -25,9 +25,28 @@ const ResearchList = () => {
   const { checkAndConsume } = useFeatureAccess();
   const [projects, setProjects] = useState<ResearchProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const cacheKey = user ? `research_projects_cache_${user.id}` : null;
 
   const fetchProjects = async () => {
+    if (!user) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    if (cacheKey) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          setProjects(JSON.parse(cached));
+          setLoading(false);
+        } catch {
+          localStorage.removeItem(cacheKey);
+        }
+      }
+    }
+
     try {
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('timeout')), 12000)
@@ -35,9 +54,13 @@ const ResearchList = () => {
       const queryPromise = supabase
         .from('research_projects')
         .select('id, title, status, created_at')
+        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
       const result: any = await Promise.race([queryPromise, timeoutPromise]);
-      if (result?.data) setProjects(result.data);
+      if (result?.data) {
+        setProjects(result.data);
+        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result.data));
+      }
       else if (result?.error) {
         toast({ title: result.error.message, variant: 'destructive' });
       }
@@ -51,7 +74,7 @@ const ResearchList = () => {
     }
   };
 
-  useEffect(() => { fetchProjects(); }, []);
+  useEffect(() => { fetchProjects(); }, [user?.id]);
 
   const createProject = async () => {
     const allowed = await checkAndConsume('research', lang);
@@ -65,12 +88,19 @@ const ResearchList = () => {
       toast({ title: error.message, variant: 'destructive' });
       return;
     }
+    const nextProjects = [{ id: data.id, title: '', status: 'draft', created_at: new Date().toISOString() }, ...projects];
+    setProjects(nextProjects);
+    if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(nextProjects));
     navigate(`/project/${data.id}`);
   };
 
   const deleteProject = async (id: string) => {
     await supabase.from('research_projects').delete().eq('id', id);
-    setProjects(prev => prev.filter(p => p.id !== id));
+    setProjects(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+      return next;
+    });
   };
 
   return (
