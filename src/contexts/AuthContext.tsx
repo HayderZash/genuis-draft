@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import { clearStoredAuthTokens, readStoredSession, shouldClearStoredSession } from '@/lib/auth-storage';
 
 interface AuthContextType {
   user: User | null;
@@ -19,30 +20,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
+    const applySession = (nextSession: Session | null) => {
+      if (!mounted) return;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      setLoading(false);
+    };
+
+    const persistedSession = readStoredSession();
+    if (persistedSession) {
+      applySession(persistedSession);
+    }
+
     // Set up listener FIRST (synchronous handler — never put async work here)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      applySession(session);
     });
 
     // THEN check existing session, with stale-token recovery
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        applySession(session);
       })
       .catch((err) => {
-        console.warn('[Auth] getSession failed, clearing stale token:', err?.message);
-        try {
-          Object.keys(localStorage)
-            .filter(k => k.startsWith('sb-') && k.includes('auth-token'))
-            .forEach(k => localStorage.removeItem(k));
-        } catch {}
+        console.warn('[Auth] getSession failed:', err?.message);
+        if (shouldClearStoredSession(err)) clearStoredAuthTokens();
+        applySession(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!persistedSession) applySession(null);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, displayName: string) => {

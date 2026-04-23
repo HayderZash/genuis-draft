@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -10,20 +11,23 @@ import { FloatingAIAssistant } from "@/components/FloatingAIAssistant";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
-import ProjectEditor from "./pages/ProjectEditor";
-import Proofreading from "./pages/Proofreading";
-import Reports from "./pages/Reports";
-import CVBuilder from "./pages/CVBuilder";
-import ResearchList from "./pages/ResearchList";
-import Summarizer from "./pages/Summarizer";
-import Translator from "./pages/Translator";
-import AIAssistant from "./pages/AIAssistant";
-import NotFound from "./pages/NotFound";
-import AdminDashboard from "./pages/AdminDashboard";
-import ExamExpert from "./pages/ExamExpert";
-import Theses from "./pages/Theses";
+
+const ProjectEditor = lazy(() => import("./pages/ProjectEditor"));
+const Proofreading = lazy(() => import("./pages/Proofreading"));
+const Reports = lazy(() => import("./pages/Reports"));
+const CVBuilder = lazy(() => import("./pages/CVBuilder"));
+const ResearchList = lazy(() => import("./pages/ResearchList"));
+const Summarizer = lazy(() => import("./pages/Summarizer"));
+const Translator = lazy(() => import("./pages/Translator"));
+const AIAssistant = lazy(() => import("./pages/AIAssistant"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const ExamExpert = lazy(() => import("./pages/ExamExpert"));
+const Theses = lazy(() => import("./pages/Theses"));
 
 const queryClient = new QueryClient();
+
+const RouteFallback = () => <div className="flex items-center justify-center min-h-screen text-muted-foreground">...</div>;
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -38,26 +42,27 @@ const AppRoutes = () => {
   return (
   <>
     {showNavbar && <Navbar />}
-    <Routes>
-      <Route path="/landing" element={<Landing />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/research" element={<ProtectedRoute><ResearchList /></ProtectedRoute>} />
-      <Route path="/project/:id" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
-      <Route path="/proofreading" element={<ProtectedRoute><Proofreading /></ProtectedRoute>} />
-      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-      <Route path="/cvs" element={<ProtectedRoute><CVBuilder /></ProtectedRoute>} />
-      <Route path="/summarizer" element={<ProtectedRoute><Summarizer /></ProtectedRoute>} />
-      <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
-      <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
-      <Route path="/exam-expert" element={<ProtectedRoute><ExamExpert /></ProtectedRoute>} />
-      <Route path="/theses" element={<ProtectedRoute><Theses /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-      {/* Legacy redirects */}
-      <Route path="/plagiarism" element={<Navigate to="/proofreading" replace />} />
-      <Route path="/image-generator" element={<Navigate to="/" replace />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/research" element={<ProtectedRoute><ResearchList /></ProtectedRoute>} />
+        <Route path="/project/:id" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
+        <Route path="/proofreading" element={<ProtectedRoute><Proofreading /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+        <Route path="/cvs" element={<ProtectedRoute><CVBuilder /></ProtectedRoute>} />
+        <Route path="/summarizer" element={<ProtectedRoute><Summarizer /></ProtectedRoute>} />
+        <Route path="/translator" element={<ProtectedRoute><Translator /></ProtectedRoute>} />
+        <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+        <Route path="/exam-expert" element={<ProtectedRoute><ExamExpert /></ProtectedRoute>} />
+        <Route path="/theses" element={<ProtectedRoute><Theses /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/plagiarism" element={<Navigate to="/proofreading" replace />} />
+        <Route path="/image-generator" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
     {showNavbar && <FloatingAIAssistant />}
   </>
   );
