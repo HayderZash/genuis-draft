@@ -37,7 +37,11 @@ export const useFeatureAccess = () => {
       }
       return true;
     } catch {
-      return true; // Allow on error (fail-open for better UX)
+      toast({
+        title: lang === 'ar' ? 'تعذر التحقق من صلاحية الميزة حالياً' : 'Could not verify feature access right now',
+        variant: 'destructive',
+      });
+      return false;
     }
   };
 
