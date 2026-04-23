@@ -6,6 +6,13 @@ type PersistedSessionPayload = {
   currentSession?: Session | null;
 };
 
+const isSessionLike = (value: unknown): value is Session => {
+  if (!value || typeof value !== 'object') return false;
+
+  const maybeSession = value as Partial<Session>;
+  return typeof maybeSession.access_token === 'string' && !!maybeSession.user;
+};
+
 export const readStoredSession = (): Session | null => {
   if (typeof window === 'undefined') return null;
 
@@ -19,8 +26,8 @@ export const readStoredSession = (): Session | null => {
       const parsed = JSON.parse(raw) as PersistedSessionPayload | Session;
       const candidate = 'currentSession' in parsed ? parsed.currentSession : parsed;
 
-      if (candidate?.access_token && candidate?.user) {
-        return candidate as Session;
+      if (isSessionLike(candidate)) {
+        return candidate;
       }
     }
   } catch {
