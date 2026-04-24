@@ -2,6 +2,23 @@ import type { Session } from '@supabase/supabase-js';
 
 const AUTH_TOKEN_FRAGMENT = 'auth-token';
 
+const getProjectRef = () => {
+  const configuredProjectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  if (configuredProjectId) return configuredProjectId;
+
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  try {
+    return url ? new URL(url).hostname.split('.')[0] : null;
+  } catch {
+    return null;
+  }
+};
+
+const getProjectStorageKey = () => {
+  const projectRef = getProjectRef();
+  return projectRef ? `sb-${projectRef}-${AUTH_TOKEN_FRAGMENT}` : null;
+};
+
 type PersistedSessionPayload = {
   currentSession?: Session | null;
 };
@@ -17,9 +34,12 @@ export const readStoredSession = (): Session | null => {
   if (typeof window === 'undefined') return null;
 
   try {
-    for (const key of Object.keys(window.localStorage)) {
-      if (!key.includes(AUTH_TOKEN_FRAGMENT)) continue;
+    const projectStorageKey = getProjectStorageKey();
+    const candidateKeys = projectStorageKey
+      ? [projectStorageKey]
+      : Object.keys(window.localStorage).filter((key) => key.includes(AUTH_TOKEN_FRAGMENT));
 
+    for (const key of candidateKeys) {
       const raw = window.localStorage.getItem(key);
       if (!raw) continue;
 
@@ -41,6 +61,13 @@ export const clearStoredAuthTokens = () => {
   if (typeof window === 'undefined') return;
 
   try {
+    const projectStorageKey = getProjectStorageKey();
+
+    if (projectStorageKey) {
+      window.localStorage.removeItem(projectStorageKey);
+      return;
+    }
+
     Object.keys(window.localStorage)
       .filter((key) => key.includes(AUTH_TOKEN_FRAGMENT))
       .forEach((key) => window.localStorage.removeItem(key));
