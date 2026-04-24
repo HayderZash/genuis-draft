@@ -46,6 +46,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/landing" element={<Landing />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/index" element={<Navigate to="/" replace />} />
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/research" element={<ProtectedRoute><ResearchList /></ProtectedRoute>} />
         <Route path="/project/:id" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
