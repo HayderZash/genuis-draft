@@ -87,19 +87,23 @@ const Dashboard = () => {
       }
     }
 
-    // Per-request timeout helper – never let one slow query block the dashboard
-    const withTimeout = <T,>(p: PromiseLike<T>, ms = 12000): Promise<T> =>
-      Promise.race([
-        Promise.resolve(p) as Promise<T>,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-      ]);
+    const runQuery = async <T,>(factory: (signal: AbortSignal) => Promise<T>, ms = 12000): Promise<T> => {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), ms);
+
+      try {
+        return await factory(controller.signal);
+      } finally {
+        window.clearTimeout(timer);
+      }
+    };
 
     // Use allSettled so one slow/failing table never wipes the others
     const [researchRes, reportsRes, cvsRes, thesesRes] = await Promise.allSettled([
-      withTimeout(supabase.from('research_projects').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false })),
-      withTimeout(supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false })),
-      withTimeout(supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false })),
-      withTimeout(supabase.from('theses').select('id, title, status, created_at').order('updated_at', { ascending: false })),
+      runQuery((signal) => supabase.from('research_projects').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
+      runQuery((signal) => supabase.from('reports').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
+      runQuery((signal) => supabase.from('cvs').select('id, full_name, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
+      runQuery((signal) => supabase.from('theses').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
     ]);
 
     const allItems: CompletedItem[] = [];
