@@ -87,26 +87,48 @@ const Dashboard = () => {
       }
     }
 
-    // Per-request timeout helper – never let one slow query block the dashboard
-    const withTimeout = <T,>(p: PromiseLike<T>, ms = 12000): Promise<T> =>
-      Promise.race([
-        Promise.resolve(p) as Promise<T>,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-      ]);
+    const runQuery = async <T,>(factory: (signal: AbortSignal) => PromiseLike<T>, ms = 12000): Promise<T> => {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), ms);
+
+      try {
+        return await factory(controller.signal);
+      } finally {
+        window.clearTimeout(timer);
+      }
+    };
+
+    const failures: string[] = [];
+    const allItems: CompletedItem[] = [];
+
+    const researchRes = await runQuery((signal) =>
+      supabase
+        .from('research_projects')
+        .select('id, title, status, created_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .abortSignal(signal)
+    ).catch((error) => {
+      failures.push('research');
+      throw error;
+    }).catch(() => null as any);
+
+    if (researchRes?.data) {
+      researchRes.data.forEach((p: any) => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at }));
+      if (researchCacheKey) localStorage.setItem(researchCacheKey, JSON.stringify(researchRes.data));
+      setItems([...allItems].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      setLoading(false);
+    }
 
     // Use allSettled so one slow/failing table never wipes the others
-    const [researchRes, reportsRes, cvsRes, thesesRes] = await Promise.allSettled([
-      withTimeout(supabase.from('research_projects').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false })),
-      withTimeout(supabase.from('reports').select('id, title, status, created_at').order('updated_at', { ascending: false })),
-      withTimeout(supabase.from('cvs').select('id, full_name, status, created_at').order('updated_at', { ascending: false })),
-      withTimeout(supabase.from('theses').select('id, title, status, created_at').order('updated_at', { ascending: false })),
+    const [reportsRes, cvsRes, thesesRes] = await Promise.allSettled([
+      runQuery((signal) => supabase.from('reports').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
+      runQuery((signal) => supabase.from('cvs').select('id, full_name, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
+      runQuery((signal) => supabase.from('theses').select('id, title, status, created_at').eq('user_id', user.id).order('updated_at', { ascending: false }).abortSignal(signal)),
     ]);
 
-    const allItems: CompletedItem[] = [];
     const pick = (res: any) => (res.status === 'fulfilled' ? res.value?.data : null);
-    const failures: string[] = [];
 
-    const r = pick(researchRes); if (r) { r.forEach((p: any) => allItems.push({ id: p.id, title: p.title || (lang === 'ar' ? 'بحث جديد' : 'New Research'), type: 'research', status: p.status, created_at: p.created_at })); if (researchCacheKey) localStorage.setItem(researchCacheKey, JSON.stringify(r)); } else if (researchRes.status === 'rejected') failures.push('research');
     const rp = pick(reportsRes); if (rp) rp.forEach((x: any) => allItems.push({ id: x.id, title: x.title || (lang === 'ar' ? 'تقرير جديد' : 'New Report'), type: 'report', status: x.status, created_at: x.created_at })); else if (reportsRes.status === 'rejected') failures.push('reports');
     const cv = pick(cvsRes); if (cv) cv.forEach((c: any) => allItems.push({ id: c.id, title: c.full_name || (lang === 'ar' ? 'سيرة ذاتية' : 'CV'), type: 'cv', status: c.status, created_at: c.created_at })); else if (cvsRes.status === 'rejected') failures.push('cvs');
     const th = pick(thesesRes); if (th) th.forEach((t: any) => allItems.push({ id: t.id, title: t.title || (lang === 'ar' ? 'رسالة جديدة' : 'New Thesis'), type: 'thesis' as any, status: t.status, created_at: t.created_at })); else if (thesesRes.status === 'rejected') failures.push('theses');
