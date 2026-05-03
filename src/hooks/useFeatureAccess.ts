@@ -16,41 +16,27 @@ const FEATURE_COSTS: Record<string, number> = {
 export const useFeatureAccess = () => {
   const { user } = useAuth();
 
-  const runQuery = async <T,>(factory: (signal: AbortSignal) => Promise<T>, ms = 4000): Promise<T> => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), ms);
-
-    try {
-      return await factory(controller.signal);
-    } finally {
-      window.clearTimeout(timer);
-    }
-  };
-
   const checkAndConsume = async (feature: string, lang: string = 'ar'): Promise<boolean> => {
     if (!user) return false;
     const cost = FEATURE_COSTS[feature] ?? 0;
 
     try {
-      const [{ data: profile }, { data: access }] = await Promise.all([
-        runQuery((signal) =>
-          supabase
-            .from('profiles')
-            .select('account_type, is_active, expires_at')
-            .eq('user_id', user.id)
-            .maybeSingle()
-            .abortSignal(signal)
-        ),
-        runQuery((signal) =>
-          supabase
-            .from('user_feature_access')
-            .select('is_enabled')
-            .eq('user_id', user.id)
-            .eq('feature', feature)
-            .maybeSingle()
-            .abortSignal(signal)
-        ),
+      const [profileRes, accessRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('account_type, is_active, expires_at')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('user_feature_access')
+          .select('is_enabled')
+          .eq('user_id', user.id)
+          .eq('feature', feature)
+          .maybeSingle(),
       ]);
+
+      const profile = profileRes.data;
+      const access = accessRes.data;
 
       if (!profile) {
         toast({
