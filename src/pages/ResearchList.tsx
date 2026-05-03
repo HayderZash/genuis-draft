@@ -25,6 +25,7 @@ const ResearchList = () => {
   const { checkAndConsume } = useFeatureAccess();
   const [projects, setProjects] = useState<ResearchProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const cacheKey = user ? `research_projects_cache_${user.id}` : null;
 
   const fetchProjects = async () => {
@@ -48,15 +49,16 @@ const ResearchList = () => {
     }
 
     try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 12000)
-      );
-      const queryPromise = supabase
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 12000);
+      const result = await supabase
         .from('research_projects')
         .select('id, title, status, created_at')
         .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
-      const result: any = await Promise.race([queryPromise, timeoutPromise]);
+        .order('updated_at', { ascending: false })
+        .abortSignal(controller.signal);
+      window.clearTimeout(timer);
+
       if (result?.data) {
         setProjects(result.data);
         if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result.data));
@@ -77,20 +79,30 @@ const ResearchList = () => {
   useEffect(() => { fetchProjects(); }, [user?.id]);
 
   const createProject = async () => {
+    if (!user || creating) return;
+    setCreating(true);
     const allowed = await checkAndConsume('research', lang);
-    if (!allowed) return;
+    if (!allowed) {
+      setCreating(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('research_projects')
       .insert({ user_id: user!.id, title: '', chapter_count: 5, chapters: getDefaultChapters(5) })
       .select('id')
       .single();
+
     if (error) {
+      setCreating(false);
       toast({ title: error.message, variant: 'destructive' });
       return;
     }
+
     const nextProjects = [{ id: data.id, title: '', status: 'draft', created_at: new Date().toISOString() }, ...projects];
     setProjects(nextProjects);
     if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(nextProjects));
+    setCreating(false);
     navigate(`/project/${data.id}`);
   };
 
@@ -111,7 +123,7 @@ const ResearchList = () => {
 
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">{t('myResearch')}</h2>
-        <Button onClick={createProject} className="gap-2">
+        <Button onClick={createProject} className="gap-2" disabled={creating}>
           <Plus className="h-4 w-4" /> {t('newResearch')}
         </Button>
       </div>
