@@ -21,9 +21,54 @@ export const useFeatureAccess = () => {
     const cost = FEATURE_COSTS[feature] ?? 0;
 
     try {
+      const [profileRes, accessRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('account_type, is_active, expires_at')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('user_feature_access')
+          .select('is_enabled')
+          .eq('user_id', user.id)
+          .eq('feature', feature)
+          .maybeSingle(),
+      ]);
+
+      const profile = profileRes.data;
+      const access = accessRes.data;
+
+      if (!profile) {
+        toast({
+          title: lang === 'ar' ? 'تعذر التحقق من الحساب حالياً' : 'Could not verify account right now',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      if (!profile.is_active) {
+        toast({ title: lang === 'ar' ? 'تم تعطيل حسابك. تواصل مع المدير.' : 'Your account is disabled.', variant: 'destructive' });
+        return false;
+      }
+
+      if (profile.expires_at && new Date(profile.expires_at) < new Date()) {
+        toast({ title: lang === 'ar' ? 'انتهت صلاحية حسابك. تواصل مع المدير.' : 'Your account has expired.', variant: 'destructive' });
+        return false;
+      }
+
+      if (access && !access.is_enabled) {
+        toast({ title: lang === 'ar' ? 'هذه الميزة غير متاحة لحسابك' : 'This feature is unavailable for your account', variant: 'destructive' });
+        return false;
+      }
+
+      if (profile.account_type !== 'points' || cost === 0) {
+        return true;
+      }
+
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: { action: 'consume-points', userId: user.id, feature, cost },
       });
+
       if (error) throw error;
       if (data?.allowed === false) {
         const msg = lang === 'ar'
@@ -38,7 +83,7 @@ export const useFeatureAccess = () => {
       return true;
     } catch {
       toast({
-        title: lang === 'ar' ? 'تعذر التحقق من صلاحية الميزة حالياً' : 'Could not verify feature access right now',
+        title: lang === 'ar' ? 'تعذر التحقق من صلاحية الميزة حالياً، حاول مرة أخرى' : 'Could not verify feature access right now, please try again',
         variant: 'destructive',
       });
       return false;

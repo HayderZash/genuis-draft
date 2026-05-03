@@ -94,7 +94,7 @@ export function getProviderKey(provider: AIProvider): string {
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
-  const { saveMultipleSettings, syncToLocal } = useUserSettings();
+  const { saveMultipleSettings } = useUserSettings();
 
   const [provider, setProvider] = useState<AIProvider>('openai');
   const [apiKey, setApiKey] = useState('');
@@ -108,27 +108,20 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   // Load only ONCE when dialog opens; do NOT depend on syncToLocal (it changes every render and causes a reset loop that wipes typed input).
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    const load = async () => {
-      try { await syncToLocal(); } catch { /* ignore — fall back to localStorage */ }
-      if (cancelled) return;
-      const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
-      setProvider(savedProvider);
-      setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
-      setShowKey(false);
-      setMergeMode(localStorage.getItem('ai_merge_mode') === 'true');
-      setMergeProviders(JSON.parse(localStorage.getItem('ai_merge_providers') || '[]'));
-      const keys: Record<string, string> = {};
-      const shows: Record<string, boolean> = {};
-      ALL_PROVIDERS.forEach(p => {
-        keys[p.value] = localStorage.getItem(PROVIDER_KEY_MAP[p.value]) || '';
-        shows[p.value] = false;
-      });
-      setMergeKeys(keys as any);
-      setShowMergeKeys(shows as any);
-    };
-    load();
-    return () => { cancelled = true; };
+    const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
+    setProvider(savedProvider);
+    setApiKey(localStorage.getItem(PROVIDER_KEY_MAP[savedProvider]) || '');
+    setShowKey(false);
+    setMergeMode(localStorage.getItem('ai_merge_mode') === 'true');
+    setMergeProviders(JSON.parse(localStorage.getItem('ai_merge_providers') || '[]'));
+    const keys: Record<string, string> = {};
+    const shows: Record<string, boolean> = {};
+    ALL_PROVIDERS.forEach(p => {
+      keys[p.value] = localStorage.getItem(PROVIDER_KEY_MAP[p.value]) || '';
+      shows[p.value] = false;
+    });
+    setMergeKeys(keys as any);
+    setShowMergeKeys(shows as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -156,7 +149,15 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
       settings.ai_provider = provider;
       settings[PROVIDER_KEY_MAP[provider]] = apiKey;
     }
-    await saveMultipleSettings(settings);
+
+    Object.entries(settings).forEach(([k, v]) => localStorage.setItem(k, v));
+
+    try {
+      await saveMultipleSettings(settings);
+    } catch {
+      // local cache already updated to avoid losing keys on slow backend
+    }
+
     toast({ title: t('apiKeySaved') });
     onOpenChange(false);
   };
