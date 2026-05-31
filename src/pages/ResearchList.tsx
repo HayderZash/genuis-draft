@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ArrowLeft, FileText, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, FileText, Trash2, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getDefaultChapters } from '@/pages/Dashboard';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
@@ -29,81 +29,68 @@ const ResearchList = () => {
   const cacheKey = user ? `research_projects_cache_${user.id}` : null;
 
   const fetchProjects = async () => {
-    if (!user) {
-      setProjects([]);
-      setLoading(false);
-      return;
-    }
+    if (!user) { setProjects([]); setLoading(false); return; }
 
-    setLoading(true);
+    // Show cache immediately
     if (cacheKey) {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         try {
-          setProjects(JSON.parse(cached));
-          setLoading(false);
-        } catch {
-          localStorage.removeItem(cacheKey);
-        }
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length) {
+            setProjects(parsed);
+            setLoading(false);
+          }
+        } catch {}
       }
     }
 
+    // Plain query — no AbortController. If it's slow, we just keep cached state.
     try {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), 12000);
-      const result = await supabase
+      const { data } = await supabase
         .from('research_projects')
         .select('id, title, status, created_at')
         .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-        .abortSignal(controller.signal);
-      window.clearTimeout(timer);
+        .order('updated_at', { ascending: false });
 
-      if (result?.data) {
-        setProjects(result.data);
-        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result.data));
+      if (Array.isArray(data)) {
+        setProjects(data);
+        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(data));
       }
-      else if (result?.error) {
-        toast({ title: result.error.message, variant: 'destructive' });
-      }
-    } catch (e: any) {
-      toast({
-        title: lang === 'ar' ? 'تأخّر تحميل البحوث - حاول التحديث' : 'Loading research timed out - press refresh',
-        variant: 'destructive',
-      });
+    } catch {
+      // Silent — cache still shown, user can press Refresh
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchProjects(); }, [user?.id]);
+  useEffect(() => { fetchProjects(); /* eslint-disable-next-line */ }, [user?.id]);
 
   const createProject = async () => {
     if (!user || creating) return;
     setCreating(true);
-    const allowed = await checkAndConsume('research', lang);
-    if (!allowed) {
+    try {
+      const allowed = await checkAndConsume('research', lang);
+      if (!allowed) return;
+
+      const { data, error } = await supabase
+        .from('research_projects')
+        .insert({ user_id: user.id, title: '', chapter_count: 5, chapters: getDefaultChapters(5) })
+        .select('id')
+        .single();
+
+      if (error) {
+        toast({ title: error.message || (lang === 'ar' ? 'تعذر إنشاء البحث' : 'Could not create research'), variant: 'destructive' });
+        return;
+      }
+
+      const next = [{ id: data.id, title: '', status: 'draft', created_at: new Date().toISOString() }, ...projects];
+      setProjects(next);
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next));
+      navigate(`/project/${data.id}`);
+    } finally {
       setCreating(false);
-      return;
     }
-
-    const { data, error } = await supabase
-      .from('research_projects')
-      .insert({ user_id: user!.id, title: '', chapter_count: 5, chapters: getDefaultChapters(5) })
-      .select('id')
-      .single();
-
-    if (error) {
-      setCreating(false);
-      toast({ title: error.message, variant: 'destructive' });
-      return;
-    }
-
-    const nextProjects = [{ id: data.id, title: '', status: 'draft', created_at: new Date().toISOString() }, ...projects];
-    setProjects(nextProjects);
-    if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(nextProjects));
-    setCreating(false);
-    navigate(`/project/${data.id}`);
   };
 
   const deleteProject = async (id: string) => {
@@ -116,7 +103,7 @@ const ResearchList = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-4xl py-8 px-4">
+    <div className="container mx-auto max-w-4xl py-8 px-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <Button variant="ghost" onClick={() => navigate('/')} className="gap-1 mb-6">
         <ArrowLeft className="h-4 w-4" /> {t('backToDashboard')}
       </Button>
@@ -124,12 +111,13 @@ const ResearchList = () => {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">{t('myResearch')}</h2>
         <Button onClick={createProject} className="gap-2" disabled={creating}>
-          <Plus className="h-4 w-4" /> {t('newResearch')}
+          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          {t('newResearch')}
         </Button>
       </div>
 
-      {loading ? (
-        <div className="text-center text-muted-foreground py-12">...</div>
+      {loading && projects.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12">{lang === 'ar' ? 'جاري التحميل...' : 'Loading...'}</div>
       ) : projects.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
