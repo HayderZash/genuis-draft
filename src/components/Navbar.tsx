@@ -2,7 +2,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Globe, LogOut, Settings, Shield } from 'lucide-react';
+import { Globe, LogOut, Settings, Shield, Crown } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsDialog } from './SettingsDialog';
@@ -31,6 +31,10 @@ export const Navbar = () => {
             </Button>
             {user && (
               <>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/pricing')} className="gap-1 text-amber-600 hover:text-amber-700">
+                  <Crown className="h-4 w-4" />
+                  {lang === 'ar' ? 'الاشتراكات' : 'Pricing'}
+                </Button>
                 {isAdmin && (
                   <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="gap-1">
                     <Shield className="h-4 w-4" />
