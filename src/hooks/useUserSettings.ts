@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { withRetry } from '@/lib/retry';
 
 export const useUserSettings = () => {
   const { user } = useAuth();
@@ -8,13 +9,16 @@ export const useUserSettings = () => {
   const loadSettings = useCallback(async (): Promise<Record<string, string>> => {
     if (!user) return {};
     try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('setting_key, setting_value')
-        .eq('user_id', user.id);
-      if (error) throw error;
+      const data = await withRetry(async () => {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('setting_key, setting_value')
+          .eq('user_id', user.id);
+        if (error) throw error;
+        return data || [];
+      }, { retries: 2, timeoutMs: 6000 });
       const settings: Record<string, string> = {};
-      (data || []).forEach(row => { settings[row.setting_key] = row.setting_value; });
+      data.forEach((row: any) => { settings[row.setting_key] = row.setting_value; });
       return settings;
     } catch {
       return {};
@@ -22,43 +26,42 @@ export const useUserSettings = () => {
   }, [user]);
 
   const saveSetting = useCallback(async (key: string, value: string) => {
-    if (!user) {
-      localStorage.setItem(key, value);
-      return;
-    }
+    // Always update local cache first
+    localStorage.setItem(key, value);
+    if (!user) return;
     try {
-      const { error } = await supabase
-        .from('user_settings')
-        .upsert(
-          { user_id: user.id, setting_key: key, setting_value: value },
-          { onConflict: 'user_id,setting_key' }
-        );
-      if (error) throw error;
-      // Also keep localStorage as cache
-      localStorage.setItem(key, value);
+      await withRetry(async () => {
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert(
+            { user_id: user.id, setting_key: key, setting_value: value },
+            { onConflict: 'user_id,setting_key' }
+          );
+        if (error) throw error;
+      }, { retries: 3, baseMs: 500, timeoutMs: 8000 });
     } catch {
-      localStorage.setItem(key, value);
+      // Local cache already has it; will sync on next save
     }
   }, [user]);
 
   const saveMultipleSettings = useCallback(async (settings: Record<string, string>) => {
-    if (!user) {
-      Object.entries(settings).forEach(([k, v]) => localStorage.setItem(k, v));
-      return;
-    }
+    // Local cache first (optimistic)
+    Object.entries(settings).forEach(([k, v]) => localStorage.setItem(k, v));
+    if (!user) return;
     try {
       const rows = Object.entries(settings).map(([k, v]) => ({
         user_id: user.id,
         setting_key: k,
         setting_value: v,
       }));
-      const { error } = await supabase
-        .from('user_settings')
-        .upsert(rows, { onConflict: 'user_id,setting_key' });
-      if (error) throw error;
-      Object.entries(settings).forEach(([k, v]) => localStorage.setItem(k, v));
+      await withRetry(async () => {
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert(rows, { onConflict: 'user_id,setting_key' });
+        if (error) throw error;
+      }, { retries: 3, baseMs: 500, timeoutMs: 10000 });
     } catch {
-      Object.entries(settings).forEach(([k, v]) => localStorage.setItem(k, v));
+      // Local cache still has values
     }
   }, [user]);
 

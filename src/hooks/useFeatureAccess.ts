@@ -1,75 +1,151 @@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { safeRetry, withTimeout } from '@/lib/retry';
+import { DEFAULT_PLATFORM_SETTINGS } from '@/hooks/usePlatformSettings';
 
-const FEATURE_COSTS: Record<string, number> = {
-  research: 2,
-  thesis: 5,
-  reports: 1,
-  cv: 0.5,
-  proofreading: 0.5,
-  translator: 0,
-  summarizer: 0.25,
-  exam_expert: 0.01,
+// Map UI feature keys -> point cost keys in platform_settings
+const COST_KEY_MAP: Record<string, keyof typeof DEFAULT_PLATFORM_SETTINGS> = {
+  research: 'cost_research',
+  thesis: 'cost_thesis',
+  reports: 'cost_report',
+  report: 'cost_report',
+  cv: 'cost_cv',
+  proofreading: 'cost_proofread',
+  exam_expert: 'cost_exam',
+  summarizer: 'cost_summarize',
+  translator: 'cost_translate',
 };
 
-// Helper: race a promise against a timeout that resolves to a sentinel
-const withTimeout = <T,>(p: PromiseLike<T>, ms: number, fallback: T): Promise<T> =>
-  new Promise<T>((resolve) => {
-    let done = false;
-    const t = window.setTimeout(() => { if (!done) { done = true; resolve(fallback); } }, ms);
-    Promise.resolve(p).then((v) => { if (!done) { done = true; window.clearTimeout(t); resolve(v); } })
-      .catch(() => { if (!done) { done = true; window.clearTimeout(t); resolve(fallback); } });
-  });
+// Features that are completely LOCKED on the free plan
+const FREE_LOCKED = new Set(['thesis', 'proofreading', 'cv']);
+
+const getCachedSettings = () => {
+  try {
+    const c = localStorage.getItem('platform_settings_cache_v1');
+    if (c) return { ...DEFAULT_PLATFORM_SETTINGS, ...JSON.parse(c) };
+  } catch {}
+  return DEFAULT_PLATFORM_SETTINGS;
+};
+
+const getCost = (feature: string): number => {
+  const key = COST_KEY_MAP[feature];
+  if (!key) return 0;
+  const settings = getCachedSettings();
+  return Number(settings[key]) || 0;
+};
 
 export const useFeatureAccess = () => {
   const { user } = useAuth();
 
   const checkAndConsume = async (feature: string, lang: string = 'ar'): Promise<boolean> => {
     if (!user) return false;
-    const cost = FEATURE_COSTS[feature] ?? 0;
+    const isAr = lang === 'ar';
 
-    // 1) Fetch profile + feature access with a hard 6s ceiling each.
-    //    If they don't return in time, we FAIL-OPEN for unlimited-by-default UX
-    //    so users are never blocked by slow backend reads.
-    const profileRes = await withTimeout(
-      supabase.from('profiles').select('account_type, is_active, expires_at').eq('user_id', user.id).maybeSingle(),
-      6000,
-      { data: null, error: null } as any,
+    // 1) Profile + access reads with retry+timeout. Fail-OPEN on errors.
+    const profileRes = await safeRetry(
+      async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('account_type, is_active, expires_at')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      },
+      null,
+      { retries: 2, timeoutMs: 6000 },
     );
-    const accessRes = await withTimeout(
-      supabase.from('user_feature_access').select('is_enabled').eq('user_id', user.id).eq('feature', feature).maybeSingle(),
-      6000,
-      { data: null, error: null } as any,
+
+    const accessRes = await safeRetry(
+      async () => {
+        const { data, error } = await supabase
+          .from('user_feature_access')
+          .select('is_enabled')
+          .eq('user_id', user.id)
+          .eq('feature', feature)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      },
+      null,
+      { retries: 2, timeoutMs: 6000 },
     );
 
-    const profile = profileRes?.data;
-    const access = accessRes?.data;
+    // Profile unavailable -> allow (don't block the user)
+    if (!profileRes) return true;
 
-    // Profile load failed or timed out -> allow (don't block the user)
-    if (!profile) return true;
-
-    if (profile.is_active === false) {
-      toast({ title: lang === 'ar' ? 'تم تعطيل حسابك. تواصل مع المدير.' : 'Your account is disabled.', variant: 'destructive' });
+    if (profileRes.is_active === false) {
+      toast({
+        title: isAr ? 'تم تعطيل حسابك. تواصل مع المدير.' : 'Your account is disabled.',
+        variant: 'destructive',
+      });
       return false;
     }
 
-    if (profile.expires_at && new Date(profile.expires_at) < new Date()) {
-      toast({ title: lang === 'ar' ? 'انتهت صلاحية حسابك. تواصل مع المدير.' : 'Your account has expired.', variant: 'destructive' });
+    if (profileRes.expires_at && new Date(profileRes.expires_at) < new Date()) {
+      toast({
+        title: isAr ? 'انتهت صلاحية حسابك. تواصل مع المدير.' : 'Your account has expired.',
+        variant: 'destructive',
+      });
       return false;
     }
 
-    if (access && access.is_enabled === false) {
-      toast({ title: lang === 'ar' ? 'هذه الميزة غير متاحة لحسابك' : 'This feature is unavailable for your account', variant: 'destructive' });
+    if (accessRes && accessRes.is_enabled === false) {
+      toast({
+        title: isAr ? 'هذه الميزة غير متاحة لحسابك' : 'This feature is unavailable for your account',
+        variant: 'destructive',
+      });
       return false;
     }
 
-    // Unlimited account or zero-cost feature -> allow without invoking edge function
-    if (profile.account_type !== 'points' || cost === 0) return true;
+    const accountType = profileRes.account_type || 'unlimited';
 
-    // Points account -> consume via edge function (with timeout fail-open to keep UX smooth)
+    // ── Free plan rules ──
+    if (accountType === 'free') {
+      if (FREE_LOCKED.has(feature)) {
+        toast({
+          title: isAr
+            ? 'هذه الميزة متاحة في الخطط المدفوعة. يرجى الترقية.'
+            : 'This feature requires a paid plan. Please upgrade.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      // 1-research cap on free plan
+      if (feature === 'research') {
+        const settings = getCachedSettings();
+        const max = settings.plan_free_max_research || 1;
+        const { count } = await withTimeout(
+          supabase
+            .from('research_projects')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id) as any,
+          5000,
+          { count: null } as any,
+        );
+        if (typeof count === 'number' && count >= max) {
+          toast({
+            title: isAr
+              ? `الخطة المجانية تسمح بـ ${max} بحث فقط. يرجى الترقية.`
+              : `Free plan allows only ${max} research project. Please upgrade.`,
+            variant: 'destructive',
+          });
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Unlimited account or zero-cost feature -> allow without points
+    const cost = getCost(feature);
+    if (accountType !== 'points' || cost === 0) return true;
+
+    // Points account: consume via edge function with timeout fail-open
     const consume = await withTimeout(
-      supabase.functions.invoke('admin-users', { body: { action: 'consume-points', userId: user.id, feature, cost } }),
+      supabase.functions.invoke('admin-users', {
+        body: { action: 'consume-points', userId: user.id, feature, cost },
+      }),
       8000,
       { data: null, error: null } as any,
     );
@@ -77,10 +153,12 @@ export const useFeatureAccess = () => {
     if (consume?.error) return true; // network failure -> don't block
     if (consume?.data?.allowed === false) {
       const code = consume.data.error;
-      const msg = lang === 'ar'
+      const msg = isAr
         ? (code === 'Feature disabled' ? 'هذه الميزة غير متاحة لحسابك' :
            code === 'Points expired' ? 'انتهت صلاحية النقاط' :
-           code === 'Insufficient points' ? 'رصيد النقاط غير كافٍ' :
+           code === 'Insufficient points' ? 'رصيد النقاط غير كافٍ — يرجى الترقية' :
+           code === 'Account expired' ? 'انتهت صلاحية حسابك' :
+           code === 'No points allocated' ? 'لا توجد نقاط مخصصة — يرجى الاشتراك' :
            'لا يمكن استخدام هذه الميزة')
         : code || 'Cannot use this feature';
       toast({ title: msg, variant: 'destructive' });

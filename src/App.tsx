@@ -24,6 +24,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const ExamExpert = lazy(() => import("./pages/ExamExpert"));
 const Theses = lazy(() => import("./pages/Theses"));
+const Pricing = lazy(() => import("./pages/Pricing"));
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ const AppRoutes = () => {
         <Route path="/exam-expert" element={<ProtectedRoute><ExamExpert /></ProtectedRoute>} />
         <Route path="/theses" element={<ProtectedRoute><Theses /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
         <Route path="/plagiarism" element={<Navigate to="/proofreading" replace />} />
         <Route path="/image-generator" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
