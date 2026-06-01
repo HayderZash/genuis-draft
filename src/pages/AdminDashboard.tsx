@@ -414,6 +414,7 @@ const AdminDashboard = () => {
                       <Select value={newAccountType} onValueChange={setNewAccountType}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="free">{isAr ? 'مجاني' : 'Free'}</SelectItem>
                           <SelectItem value="unlimited">{isAr ? 'غير محدود' : 'Unlimited'}</SelectItem>
                           <SelectItem value="points">{isAr ? 'نظام النقاط' : 'Points System'}</SelectItem>
                         </SelectContent>
@@ -544,6 +545,7 @@ const AdminDashboard = () => {
               <Select value={editAccountType} onValueChange={setEditAccountType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="free">{isAr ? 'مجاني' : 'Free'}</SelectItem>
                   <SelectItem value="unlimited">{isAr ? 'غير محدود' : 'Unlimited'}</SelectItem>
                   <SelectItem value="points">{isAr ? 'نظام النقاط' : 'Points System'}</SelectItem>
                 </SelectContent>
