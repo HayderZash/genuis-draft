@@ -17,6 +17,9 @@ const Summarizer = () => {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const { checkAndConsume } = useFeatureAccess();
+  const { isFree } = useUserPlan();
+  const { settings } = usePlatformSettings();
+  const maxChars = isFree ? (settings.plan_free_summary_chars || 1000) : Infinity;
   const [text, setText] = useState('');
   const [language, setLanguage] = useState<string>('ar');
   const [targetLength, setTargetLength] = useState('medium');
@@ -26,6 +29,15 @@ const Summarizer = () => {
   const handleSummarize = async () => {
     if (!text.trim()) {
       toast({ title: lang === 'ar' ? 'يرجى إدخال النص' : 'Please enter text', variant: 'destructive' });
+      return;
+    }
+    if (isFree && text.length > maxChars) {
+      toast({
+        title: lang === 'ar'
+          ? `الخطة المجانية محدودة بـ ${maxChars} حرف للتلخيص. تواصل عبر صفحة الاشتراكات للترقية.`
+          : `Free plan limited to ${maxChars} chars. Upgrade for more.`,
+        variant: 'destructive',
+      });
       return;
     }
     const allowed = await checkAndConsume('summarizer', lang);
