@@ -385,8 +385,97 @@ const AdminDashboard = () => {
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
           <TabsTrigger value="users">{isAr ? 'المستخدمون' : 'Users'}</TabsTrigger>
+          <TabsTrigger value="pricing">{isAr ? 'التسعير والخطط' : 'Pricing & Plans'}</TabsTrigger>
           <TabsTrigger value="contact">{isAr ? 'حسابات التواصل' : 'Contact Info'}</TabsTrigger>
         </TabsList>
+
+        {/* Pricing Tab */}
+        <TabsContent value="pricing">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5" /> {isAr ? 'أسعار الاستهلاك (نقاط لكل عملية)' : 'Consumption Costs (points per action)'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {([
+                  ['cost_research', isAr ? 'بحث' : 'Research'],
+                  ['cost_thesis', isAr ? 'أطروحة' : 'Thesis'],
+                  ['cost_report', isAr ? 'تقرير' : 'Report'],
+                  ['cost_exam', isAr ? 'امتحان' : 'Exam'],
+                  ['cost_cv', isAr ? 'سيرة ذاتية' : 'CV'],
+                  ['cost_proofread', isAr ? 'تدقيق' : 'Proofread'],
+                  ['cost_summarize', isAr ? 'تلخيص' : 'Summarize'],
+                  ['cost_translate', isAr ? 'ترجمة' : 'Translate'],
+                ] as const).map(([k, label]) => (
+                  <div key={k} className="space-y-1">
+                    <Label className="text-xs">{label}</Label>
+                    <Input type="number" min={0} step={0.25} value={(pricing as any)[k]}
+                      onChange={e => setPricing({ ...pricing, [k]: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>{isAr ? 'حدود الخطة المجانية' : 'Free Plan Limits'}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {([
+                ['plan_free_max_research', isAr ? 'عدد الأبحاث' : 'Max research'],
+                ['plan_free_max_pages_per_chapter', isAr ? 'صفحات/فصل' : 'Pages/chapter'],
+                ['plan_free_report_pages', isAr ? 'صفحات التقرير' : 'Report pages'],
+                ['plan_free_exam_questions', isAr ? 'أسئلة الامتحان' : 'Exam questions'],
+                ['plan_free_summary_chars', isAr ? 'أحرف التلخيص' : 'Summary chars'],
+              ] as const).map(([k, label]) => (
+                <div key={k} className="space-y-1">
+                  <Label className="text-xs">{label}</Label>
+                  <Input type="number" min={0} value={(pricing as any)[k]}
+                    onChange={e => setPricing({ ...pricing, [k]: parseInt(e.target.value) || 0 })} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>{isAr ? 'خطط النقاط المدفوعة (السعر بالدينار العراقي والنقاط)' : 'Paid Point Plans (IQD price & points)'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {([
+                ['5K', 'plan_5k_points', 'plan_5k_price'],
+                ['10K', 'plan_10k_points', 'plan_10k_price'],
+                ['25K', 'plan_25k_points', 'plan_25k_price'],
+              ] as const).map(([label, ptsKey, priceKey]) => (
+                <div key={label} className="grid grid-cols-3 gap-3 items-end">
+                  <div><Label className="text-xs">{isAr ? 'الخطة' : 'Plan'}</Label><Input value={label} disabled /></div>
+                  <div><Label className="text-xs">{isAr ? 'النقاط' : 'Points'}</Label>
+                    <Input type="number" min={0} value={(pricing as any)[ptsKey]}
+                      onChange={e => setPricing({ ...pricing, [ptsKey]: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div><Label className="text-xs">{isAr ? 'السعر (د.ع)' : 'Price (IQD)'}</Label>
+                    <Input type="number" min={0} value={(pricing as any)[priceKey]}
+                      onChange={e => setPricing({ ...pricing, [priceKey]: parseInt(e.target.value) || 0 })} />
+                  </div>
+                </div>
+              ))}
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <div><Label className="text-xs">{isAr ? 'الخطة' : 'Plan'}</Label><Input value={isAr ? 'غير محدودة' : 'Unlimited'} disabled /></div>
+                <div />
+                <div><Label className="text-xs">{isAr ? 'السعر (د.ع)' : 'Price (IQD)'}</Label>
+                  <Input type="number" min={0} value={pricing.plan_unlimited_price}
+                    onChange={e => setPricing({ ...pricing, plan_unlimited_price: parseInt(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <Button onClick={handleSavePricing} disabled={savingPricing} className="gap-1">
+                {savingPricing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isAr ? 'حفظ التسعير' : 'Save Pricing'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         {/* Contact Tab */}
         <TabsContent value="contact">
