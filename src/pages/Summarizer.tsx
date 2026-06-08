@@ -10,6 +10,8 @@ import { ArrowLeft, Loader2, BookOpen, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
 const Summarizer = () => {
   const { t, lang } = useLanguage();
