@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ChapterList } from './ChapterList';
 import { Loader2, Sparkles } from 'lucide-react';
 import { getDefaultChapters } from '@/pages/Dashboard';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { toast } from '@/hooks/use-toast';
 import type { ProjectData } from '@/pages/ProjectEditor';
 
 interface Props {
@@ -21,17 +24,31 @@ interface Props {
 
 export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRegenerateChapter, regeneratingIndex }: Props) => {
   const { t, lang } = useLanguage();
+  const { isFree } = useUserPlan();
+  const { settings } = usePlatformSettings();
+  const maxPagesPerChapter = isFree ? (settings.plan_free_max_pages_per_chapter || 3) : 50;
 
   const handleChapterCountChange = (val: string) => {
     const count = parseInt(val);
     const newChapters = getDefaultChapters(count);
-    const newPages = newChapters.map((_, i) => project.chapter_pages?.[i] || 10);
+    const defaultPages = isFree ? maxPagesPerChapter : 10;
+    const newPages = newChapters.map((_, i) => Math.min(project.chapter_pages?.[i] || defaultPages, maxPagesPerChapter));
     onUpdate({ chapter_count: count, chapters: newChapters, chapter_pages: newPages });
   };
 
   const handlePageChange = (index: number, pages: number) => {
+    let clamped = pages;
+    if (isFree && pages > maxPagesPerChapter) {
+      clamped = maxPagesPerChapter;
+      toast({
+        title: lang === 'ar'
+          ? `الخطة المجانية محدودة بـ ${maxPagesPerChapter} صفحات لكل فصل. للترقية تواصل عبر صفحة الاشتراكات.`
+          : `Free plan is limited to ${maxPagesPerChapter} pages per chapter. Upgrade for more.`,
+          variant: 'destructive',
+      });
+    }
     const updated = [...(project.chapter_pages || project.chapters.map(() => 10))];
-    updated[index] = pages;
+    updated[index] = clamped;
     onUpdate({ chapter_pages: updated });
   };
 
