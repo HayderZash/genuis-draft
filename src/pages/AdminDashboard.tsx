@@ -288,9 +288,33 @@ const AdminDashboard = () => {
     setFeaturePoints: (v: Record<string, number>) => void;
     pointsExpiry: string;
     setPointsExpiry: (v: string) => void;
-  }) => (
+  }) => {
+    const applyPreset = (totalPoints: number) => {
+      const next: Record<string, number> = {};
+      FEATURES.forEach(f => {
+        next[f.key] = featureAccess[f.key] !== false ? totalPoints : 0;
+      });
+      setFeaturePoints(next);
+      toast({ title: isAr ? `تم تطبيق ${totalPoints} نقطة لكل ميزة مفعلة` : `Applied ${totalPoints} pts per enabled feature` });
+    };
+
+    return (
     <div className="space-y-3">
       <Label className="font-bold">{isAr ? 'الميزات المتاحة' : 'Available Features'}</Label>
+      {accountType === 'points' && (
+        <div className="flex flex-wrap gap-2 p-2 bg-muted rounded-md">
+          <span className="text-xs self-center font-medium">{isAr ? 'خطط جاهزة:' : 'Presets:'}</span>
+          <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyPreset(platformSettings.plan_5k_points)}>
+            <Zap className="h-3 w-3" /> 5K ({platformSettings.plan_5k_points} pts)
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyPreset(platformSettings.plan_10k_points)}>
+            <Zap className="h-3 w-3" /> 10K ({platformSettings.plan_10k_points} pts)
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyPreset(platformSettings.plan_25k_points)}>
+            <Zap className="h-3 w-3" /> 25K ({platformSettings.plan_25k_points} pts)
+          </Button>
+        </div>
+      )}
       {FEATURES.map(f => (
         <div key={f.key} className="flex items-center justify-between gap-2 py-1">
           <div className="flex items-center gap-2 flex-1">
@@ -323,7 +347,8 @@ const AdminDashboard = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="container mx-auto max-w-6xl py-8 px-4">
