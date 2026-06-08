@@ -12,9 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Loader2, UserPlus, Shield, Clock, Trash2, Pencil, Phone, Send, Instagram, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus, Shield, Clock, Trash2, Pencil, Phone, Send, Instagram, Save, Zap, DollarSign } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { usePlatformSettings, DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '@/hooks/usePlatformSettings';
 
 const FEATURES = [
   { key: 'research', ar: 'البحوث الأكاديمية', en: 'Academic Research', cost: 2 },
