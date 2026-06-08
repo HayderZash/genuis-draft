@@ -89,6 +89,11 @@ const AdminDashboard = () => {
   const [contactInstagram, setContactInstagram] = useState('');
   const [savingContact, setSavingContact] = useState(false);
 
+  // Pricing/plans editable copy of platform settings
+  const [pricing, setPricing] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS);
+  const [savingPricing, setSavingPricing] = useState(false);
+  useEffect(() => { setPricing(platformSettings); }, [platformSettings]);
+
   const isAr = lang === 'ar';
 
   const callAdmin = async (body: any) => {
