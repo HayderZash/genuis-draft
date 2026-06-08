@@ -162,6 +162,21 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleSavePricing = async () => {
+    setSavingPricing(true);
+    try {
+      const settingsToSave = Object.entries(pricing).map(([key, value]) => ({ key, value: String(value) }));
+      await callAdmin({ action: 'update-settings', settings: settingsToSave });
+      try { localStorage.setItem('platform_settings_cache_v1', JSON.stringify(pricing)); } catch {}
+      await refreshPlatform();
+      toast({ title: isAr ? 'تم حفظ التسعير والخطط' : 'Pricing & plans saved' });
+    } catch (err: any) {
+      toast({ title: err.message, variant: 'destructive' });
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!newEmail || !newPassword || !newName) return;
     setSubmitting(true);
