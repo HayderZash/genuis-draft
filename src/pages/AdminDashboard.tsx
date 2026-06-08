@@ -46,6 +46,7 @@ const AdminDashboard = () => {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const { isAdmin, isRoleLoading } = useUserRole();
+  const { settings: platformSettings, refresh: refreshPlatform } = usePlatformSettings();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
