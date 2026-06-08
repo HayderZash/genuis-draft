@@ -12,9 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Loader2, UserPlus, Shield, Clock, Trash2, Pencil, Phone, Send, Instagram, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus, Shield, Clock, Trash2, Pencil, Phone, Send, Instagram, Save, Zap, DollarSign } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { usePlatformSettings, DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '@/hooks/usePlatformSettings';
 
 const FEATURES = [
   { key: 'research', ar: 'البحوث الأكاديمية', en: 'Academic Research', cost: 2 },
@@ -45,6 +46,7 @@ const AdminDashboard = () => {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const { isAdmin, isRoleLoading } = useUserRole();
+  const { settings: platformSettings, refresh: refreshPlatform } = usePlatformSettings();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -86,6 +88,11 @@ const AdminDashboard = () => {
   const [contactTelegram, setContactTelegram] = useState('');
   const [contactInstagram, setContactInstagram] = useState('');
   const [savingContact, setSavingContact] = useState(false);
+
+  // Pricing/plans editable copy of platform settings
+  const [pricing, setPricing] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS);
+  const [savingPricing, setSavingPricing] = useState(false);
+  useEffect(() => { setPricing(platformSettings); }, [platformSettings]);
 
   const isAr = lang === 'ar';
 
@@ -152,6 +159,21 @@ const AdminDashboard = () => {
       toast({ title: err.message, variant: 'destructive' });
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const handleSavePricing = async () => {
+    setSavingPricing(true);
+    try {
+      const settingsToSave = Object.entries(pricing).map(([key, value]) => ({ key, value: String(value) }));
+      await callAdmin({ action: 'update-settings', settings: settingsToSave });
+      try { localStorage.setItem('platform_settings_cache_v1', JSON.stringify(pricing)); } catch {}
+      await refreshPlatform();
+      toast({ title: isAr ? 'تم حفظ التسعير والخطط' : 'Pricing & plans saved' });
+    } catch (err: any) {
+      toast({ title: err.message, variant: 'destructive' });
+    } finally {
+      setSavingPricing(false);
     }
   };
 
@@ -286,9 +308,33 @@ const AdminDashboard = () => {
     setFeaturePoints: (v: Record<string, number>) => void;
     pointsExpiry: string;
     setPointsExpiry: (v: string) => void;
-  }) => (
+  }) => {
+    const applyPreset = (totalPoints: number) => {
+      const next: Record<string, number> = {};
+      FEATURES.forEach(f => {
+        next[f.key] = featureAccess[f.key] !== false ? totalPoints : 0;
+      });
+      setFeaturePoints(next);
+      toast({ title: isAr ? `تم تطبيق ${totalPoints} نقطة لكل ميزة مفعلة` : `Applied ${totalPoints} pts per enabled feature` });
+    };
+
+    return (
     <div className="space-y-3">
       <Label className="font-bold">{isAr ? 'الميزات المتاحة' : 'Available Features'}</Label>
+      {accountType === 'points' && (
+        <div className="flex flex-wrap gap-2 p-2 bg-muted rounded-md">
+          <span className="text-xs self-center font-medium">{isAr ? 'خطط جاهزة:' : 'Presets:'}</span>
+          <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyPreset(platformSettings.plan_5k_points)}>
+            <Zap className="h-3 w-3" /> 5K ({platformSettings.plan_5k_points} pts)
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyPreset(platformSettings.plan_10k_points)}>
+            <Zap className="h-3 w-3" /> 10K ({platformSettings.plan_10k_points} pts)
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyPreset(platformSettings.plan_25k_points)}>
+            <Zap className="h-3 w-3" /> 25K ({platformSettings.plan_25k_points} pts)
+          </Button>
+        </div>
+      )}
       {FEATURES.map(f => (
         <div key={f.key} className="flex items-center justify-between gap-2 py-1">
           <div className="flex items-center gap-2 flex-1">
@@ -321,7 +367,8 @@ const AdminDashboard = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="container mx-auto max-w-6xl py-8 px-4">
@@ -338,8 +385,97 @@ const AdminDashboard = () => {
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
           <TabsTrigger value="users">{isAr ? 'المستخدمون' : 'Users'}</TabsTrigger>
+          <TabsTrigger value="pricing">{isAr ? 'التسعير والخطط' : 'Pricing & Plans'}</TabsTrigger>
           <TabsTrigger value="contact">{isAr ? 'حسابات التواصل' : 'Contact Info'}</TabsTrigger>
         </TabsList>
+
+        {/* Pricing Tab */}
+        <TabsContent value="pricing">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5" /> {isAr ? 'أسعار الاستهلاك (نقاط لكل عملية)' : 'Consumption Costs (points per action)'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {([
+                  ['cost_research', isAr ? 'بحث' : 'Research'],
+                  ['cost_thesis', isAr ? 'أطروحة' : 'Thesis'],
+                  ['cost_report', isAr ? 'تقرير' : 'Report'],
+                  ['cost_exam', isAr ? 'امتحان' : 'Exam'],
+                  ['cost_cv', isAr ? 'سيرة ذاتية' : 'CV'],
+                  ['cost_proofread', isAr ? 'تدقيق' : 'Proofread'],
+                  ['cost_summarize', isAr ? 'تلخيص' : 'Summarize'],
+                  ['cost_translate', isAr ? 'ترجمة' : 'Translate'],
+                ] as const).map(([k, label]) => (
+                  <div key={k} className="space-y-1">
+                    <Label className="text-xs">{label}</Label>
+                    <Input type="number" min={0} step={0.25} value={(pricing as any)[k]}
+                      onChange={e => setPricing({ ...pricing, [k]: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>{isAr ? 'حدود الخطة المجانية' : 'Free Plan Limits'}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {([
+                ['plan_free_max_research', isAr ? 'عدد الأبحاث' : 'Max research'],
+                ['plan_free_max_pages_per_chapter', isAr ? 'صفحات/فصل' : 'Pages/chapter'],
+                ['plan_free_report_pages', isAr ? 'صفحات التقرير' : 'Report pages'],
+                ['plan_free_exam_questions', isAr ? 'أسئلة الامتحان' : 'Exam questions'],
+                ['plan_free_summary_chars', isAr ? 'أحرف التلخيص' : 'Summary chars'],
+              ] as const).map(([k, label]) => (
+                <div key={k} className="space-y-1">
+                  <Label className="text-xs">{label}</Label>
+                  <Input type="number" min={0} value={(pricing as any)[k]}
+                    onChange={e => setPricing({ ...pricing, [k]: parseInt(e.target.value) || 0 })} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>{isAr ? 'خطط النقاط المدفوعة (السعر بالدينار العراقي والنقاط)' : 'Paid Point Plans (IQD price & points)'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {([
+                ['5K', 'plan_5k_points', 'plan_5k_price'],
+                ['10K', 'plan_10k_points', 'plan_10k_price'],
+                ['25K', 'plan_25k_points', 'plan_25k_price'],
+              ] as const).map(([label, ptsKey, priceKey]) => (
+                <div key={label} className="grid grid-cols-3 gap-3 items-end">
+                  <div><Label className="text-xs">{isAr ? 'الخطة' : 'Plan'}</Label><Input value={label} disabled /></div>
+                  <div><Label className="text-xs">{isAr ? 'النقاط' : 'Points'}</Label>
+                    <Input type="number" min={0} value={(pricing as any)[ptsKey]}
+                      onChange={e => setPricing({ ...pricing, [ptsKey]: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div><Label className="text-xs">{isAr ? 'السعر (د.ع)' : 'Price (IQD)'}</Label>
+                    <Input type="number" min={0} value={(pricing as any)[priceKey]}
+                      onChange={e => setPricing({ ...pricing, [priceKey]: parseInt(e.target.value) || 0 })} />
+                  </div>
+                </div>
+              ))}
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <div><Label className="text-xs">{isAr ? 'الخطة' : 'Plan'}</Label><Input value={isAr ? 'غير محدودة' : 'Unlimited'} disabled /></div>
+                <div />
+                <div><Label className="text-xs">{isAr ? 'السعر (د.ع)' : 'Price (IQD)'}</Label>
+                  <Input type="number" min={0} value={pricing.plan_unlimited_price}
+                    onChange={e => setPricing({ ...pricing, plan_unlimited_price: parseInt(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <Button onClick={handleSavePricing} disabled={savingPricing} className="gap-1">
+                {savingPricing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isAr ? 'حفظ التسعير' : 'Save Pricing'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         {/* Contact Tab */}
         <TabsContent value="contact">

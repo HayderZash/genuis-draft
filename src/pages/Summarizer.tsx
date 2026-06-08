@@ -10,11 +10,16 @@ import { ArrowLeft, Loader2, BookOpen, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
 const Summarizer = () => {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const { checkAndConsume } = useFeatureAccess();
+  const { isFree } = useUserPlan();
+  const { settings } = usePlatformSettings();
+  const maxChars = isFree ? (settings.plan_free_summary_chars || 1000) : Infinity;
   const [text, setText] = useState('');
   const [language, setLanguage] = useState<string>('ar');
   const [targetLength, setTargetLength] = useState('medium');
@@ -24,6 +29,15 @@ const Summarizer = () => {
   const handleSummarize = async () => {
     if (!text.trim()) {
       toast({ title: lang === 'ar' ? 'يرجى إدخال النص' : 'Please enter text', variant: 'destructive' });
+      return;
+    }
+    if (isFree && text.length > maxChars) {
+      toast({
+        title: lang === 'ar'
+          ? `الخطة المجانية محدودة بـ ${maxChars} حرف للتلخيص. تواصل عبر صفحة الاشتراكات للترقية.`
+          : `Free plan limited to ${maxChars} chars. Upgrade for more.`,
+        variant: 'destructive',
+      });
       return;
     }
     const allowed = await checkAndConsume('summarizer', lang);
@@ -98,6 +112,10 @@ const Summarizer = () => {
                 placeholder={lang === 'ar' ? 'الصق النص المراد تلخيصه هنا...' : 'Paste the text to summarize here...'}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{text.length} {lang === 'ar' ? 'حرف' : 'chars'}</span>
+                {isFree && <span className={text.length > maxChars ? 'text-destructive' : ''}>{lang === 'ar' ? `الحد المجاني: ${maxChars}` : `Free max: ${maxChars}`}</span>}
+              </div>
             </div>
 
             <Button onClick={handleSummarize} disabled={loading || !text.trim()} className="gap-2">

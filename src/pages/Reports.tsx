@@ -14,6 +14,8 @@ import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader2, Sparkles, Download, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -32,6 +34,9 @@ const Reports = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { checkAndConsume } = useFeatureAccess();
+  const { isFree } = useUserPlan();
+  const { settings } = usePlatformSettings();
+  const maxReportPages = isFree ? (settings.plan_free_report_pages || 5) : 20;
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -65,6 +70,18 @@ const Reports = () => {
   const createReport = async () => {
     if (!form.title.trim()) {
       toast({ title: lang === 'ar' ? 'يرجى إدخال عنوان التقرير' : 'Please enter report title', variant: 'destructive' });
+      return;
+    }
+
+    // Enforce free-plan page cap
+    if (isFree && form.page_count > maxReportPages) {
+      toast({
+        title: lang === 'ar'
+          ? `الخطة المجانية محدودة بـ ${maxReportPages} صفحات للتقرير. تواصل عبر صفحة الاشتراكات للترقية.`
+          : `Free plan is limited to ${maxReportPages} pages per report. Upgrade for more.`,
+        variant: 'destructive',
+      });
+      setForm({ ...form, page_count: maxReportPages });
       return;
     }
 
@@ -210,7 +227,8 @@ const Reports = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t('pageCount')}</Label>
-                <Input type="number" min={1} max={20} value={form.page_count} onChange={e => setForm({ ...form, page_count: parseInt(e.target.value) || 3 })} />
+                <Input type="number" min={1} max={maxReportPages} value={form.page_count} onChange={e => setForm({ ...form, page_count: parseInt(e.target.value) || 3 })} />
+                {isFree && <p className="text-xs text-muted-foreground">{lang === 'ar' ? `الحد الأقصى للخطة المجانية: ${maxReportPages} صفحات` : `Free plan max: ${maxReportPages} pages`}</p>}
               </div>
               <div className="space-y-2">
                 <Label>{t('referenceCount')}</Label>
