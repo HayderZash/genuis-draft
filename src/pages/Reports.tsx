@@ -73,6 +73,18 @@ const Reports = () => {
       return;
     }
 
+    // Enforce free-plan page cap
+    if (isFree && form.page_count > maxReportPages) {
+      toast({
+        title: lang === 'ar'
+          ? `الخطة المجانية محدودة بـ ${maxReportPages} صفحات للتقرير. تواصل عبر صفحة الاشتراكات للترقية.`
+          : `Free plan is limited to ${maxReportPages} pages per report. Upgrade for more.`,
+        variant: 'destructive',
+      });
+      setForm({ ...form, page_count: maxReportPages });
+      return;
+    }
+
     // Check points
     const allowed = await checkAndConsume('reports', lang);
     if (!allowed) return;
