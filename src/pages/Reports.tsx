@@ -34,6 +34,9 @@ const Reports = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { checkAndConsume } = useFeatureAccess();
+  const { isFree } = useUserPlan();
+  const { settings } = usePlatformSettings();
+  const maxReportPages = isFree ? (settings.plan_free_report_pages || 5) : 20;
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
