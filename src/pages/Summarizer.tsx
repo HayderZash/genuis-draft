@@ -112,6 +112,10 @@ const Summarizer = () => {
                 placeholder={lang === 'ar' ? 'الصق النص المراد تلخيصه هنا...' : 'Paste the text to summarize here...'}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
               />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{text.length} {lang === 'ar' ? 'حرف' : 'chars'}</span>
+                {isFree && <span className={text.length > maxChars ? 'text-destructive' : ''}>{lang === 'ar' ? `الحد المجاني: ${maxChars}` : `Free max: ${maxChars}`}</span>}
+              </div>
             </div>
 
             <Button onClick={handleSummarize} disabled={loading || !text.trim()} className="gap-2">
