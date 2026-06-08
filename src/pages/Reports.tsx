@@ -227,7 +227,8 @@ const Reports = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t('pageCount')}</Label>
-                <Input type="number" min={1} max={20} value={form.page_count} onChange={e => setForm({ ...form, page_count: parseInt(e.target.value) || 3 })} />
+                <Input type="number" min={1} max={maxReportPages} value={form.page_count} onChange={e => setForm({ ...form, page_count: parseInt(e.target.value) || 3 })} />
+                {isFree && <p className="text-xs text-muted-foreground">{lang === 'ar' ? `الحد الأقصى للخطة المجانية: ${maxReportPages} صفحات` : `Free plan max: ${maxReportPages} pages`}</p>}
               </div>
               <div className="space-y-2">
                 <Label>{t('referenceCount')}</Label>
