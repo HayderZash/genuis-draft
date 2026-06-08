@@ -139,16 +139,36 @@ serve(async (req) => {
   try {
     const { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature } = await req.json();
 
-    if (!provider) {
-      return new Response(JSON.stringify({ error: "Missing provider" }), {
+    if (!provider || typeof provider !== "string") {
+      return new Response(JSON.stringify({ error: "Missing or invalid provider" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!systemPrompt || !userPrompt || typeof userPrompt !== "string") {
+      return new Response(JSON.stringify({ error: "Missing systemPrompt or userPrompt" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Strict API-key validation for non-lovable providers
+    const trimmedKey = typeof apiKey === "string" ? apiKey.trim() : "";
+    if (provider !== "lovable") {
+      if (!trimmedKey) {
+        return new Response(JSON.stringify({
+          error: `Missing API key for provider '${provider}'. Set it in Settings or switch to 'lovable'.`,
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (trimmedKey.length < 16 || /\s/.test(trimmedKey)) {
+        return new Response(JSON.stringify({
+          error: `Invalid API key format for provider '${provider}'.`,
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     let content = "";
 
-    // Lovable AI default fallback (no key needed)
-    if (provider === "lovable" || !apiKey) {
+    // Lovable AI gateway (no user key needed)
+    if (provider === "lovable") {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
