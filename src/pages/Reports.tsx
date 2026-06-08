@@ -14,6 +14,8 @@ import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader2, Sparkles, Download, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
 
