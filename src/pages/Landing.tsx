@@ -5,17 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  FileText, CheckCircle, FileSpreadsheet, UserCircle,
-  BookOpen, Languages, ShieldCheck, ClipboardList,
-  MessageCircle, Send, Instagram, GraduationCap, Sparkles, ArrowRight
-} from 'lucide-react';
+import { FileText, CircleCheck as CheckCircle, FileSpreadsheet, CircleUser as UserCircle, BookOpen, Languages, ShieldCheck, ClipboardList, MessageCircle, Send, Mail, GraduationCap, Sparkles, ArrowRight } from 'lucide-react';
 
 const Landing = () => {
   const { lang, setLang } = useLanguage();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [contactInfo, setContactInfo] = useState({ whatsapp: '', telegram: '', instagram: '' });
+  const [contactInfo, setContactInfo] = useState({ whatsapp: '', telegram: '', email: '' });
   const isAr = lang === 'ar';
 
   useEffect(() => {
@@ -40,11 +36,11 @@ const Landing = () => {
           .abortSignal(controller.signal);
         clearTimeout(timer);
         if (error || !data) return;
-        const map: any = { whatsapp: '', telegram: '', instagram: '' };
+        const map: any = { whatsapp: '', telegram: '', email: '' };
         data.forEach((s: any) => {
-          if (s.key === 'contact_phone') map.whatsapp = s.value;
+          if (s.key === 'contact_whatsapp') map.whatsapp = s.value;
           if (s.key === 'contact_telegram') map.telegram = s.value;
-          if (s.key === 'contact_instagram') map.instagram = s.value;
+          if (s.key === 'contact_email') map.email = s.value;
         });
         setContactInfo(map);
         localStorage.setItem('contact_info_cache', JSON.stringify(map));
@@ -79,7 +75,10 @@ const Landing = () => {
             <Button variant="ghost" size="sm" onClick={() => setLang(isAr ? 'en' : 'ar')}>
               {isAr ? 'EN' : 'عربي'}
             </Button>
-            <Button onClick={() => navigate('/auth')} className="gap-1">
+            <Button onClick={() => navigate('/auth')} variant="outline" size="sm" className="gap-1">
+              {isAr ? 'إنشاء حساب' : 'Sign Up'} <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => navigate('/auth')} size="sm" className="gap-1">
               {isAr ? 'تسجيل الدخول' : 'Login'} <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -150,14 +149,14 @@ const Landing = () => {
                 <span className="font-medium">{isAr ? 'تليكرام' : 'Telegram'}</span>
               </a>
             )}
-            {contactInfo.instagram && (
-              <a href={contactInfo.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 hover:border-primary/50 transition-colors bg-background">
-                <Instagram className="h-5 w-5 text-pink-500" />
-                <span className="font-medium">{isAr ? 'انستغرام' : 'Instagram'}</span>
+            {contactInfo.email && (
+              <a href={`mailto:${contactInfo.email}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 hover:border-primary/50 transition-colors bg-background">
+                <Mail className="h-5 w-5 text-pink-500" />
+                <span className="font-medium" dir="ltr">{contactInfo.email}</span>
               </a>
             )}
           </div>
-          {!contactInfo.whatsapp && !contactInfo.telegram && !contactInfo.instagram && (
+          {!contactInfo.whatsapp && !contactInfo.telegram && !contactInfo.email && (
             <p className="text-sm text-muted-foreground mt-4">
               {isAr ? 'لم يتم إضافة معلومات التواصل بعد' : 'Contact information not yet configured'}
             </p>
