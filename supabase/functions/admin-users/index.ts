@@ -98,14 +98,19 @@ Deno.serve(async (req) => {
 
     // ── LIST USERS ──
     if (action === "list-users") {
-      const { data: profiles } = await adminClient.from("profiles").select("*").order("created_at", { ascending: false });
-      const { data: roles } = await adminClient.from("user_roles").select("*");
-      const { data: featureAccess } = await adminClient.from("user_feature_access").select("*");
-      const { data: featurePoints } = await adminClient.from("user_feature_points").select("*");
-      const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const [profilesRes, rolesRes, featureAccessRes, featurePointsRes] = await Promise.all([
+        adminClient.from("profiles").select("*").order("created_at", { ascending: false }),
+        adminClient.from("user_roles").select("*"),
+        adminClient.from("user_feature_access").select("*"),
+        adminClient.from("user_feature_points").select("*"),
+      ]);
+
+      const profiles = profilesRes.data || [];
+      const roles = rolesRes.data || [];
+      const featureAccess = featureAccessRes.data || [];
+      const featurePoints = featurePointsRes.data || [];
 
       const enriched = (profiles || []).map((p: any) => {
-        const authUser = authUsers?.find((u: any) => u.id === p.user_id);
         const userRoles = (roles || []).filter((r: any) => r.user_id === p.user_id);
         const userFA: Record<string, boolean> = {};
         (featureAccess || []).filter((f: any) => f.user_id === p.user_id).forEach((f: any) => { userFA[f.feature] = f.is_enabled; });
@@ -114,7 +119,7 @@ Deno.serve(async (req) => {
 
         return {
           ...p,
-          email: authUser?.email || "",
+          email: p.user_id === claimsData.user.id ? userEmail : "",
           roles: userRoles.map((r: any) => r.role),
           feature_access: userFA,
           feature_points: userFP,
