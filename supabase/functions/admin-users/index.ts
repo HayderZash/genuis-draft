@@ -70,15 +70,30 @@ Deno.serve(async (req) => {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const { data: roleData } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", claimsData.user.id)
-      .eq("role", "admin")
-      .single();
+    const ADMIN_EMAIL = "hayderpailot@gmail.com";
+    const userEmail = (claimsData.user.email || "").toLowerCase();
+    let isAdmin = userEmail === ADMIN_EMAIL;
 
-    if (!roleData) {
+    if (!isAdmin) {
+      const { data: roleData } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", claimsData.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      isAdmin = !!roleData;
+    }
+
+    if (!isAdmin) {
       return json({ error: "Forbidden: Admin only" }, 403);
+    }
+
+    // Self-heal: ensure admin role row exists for the hard-coded admin
+    if (userEmail === ADMIN_EMAIL) {
+      await adminClient.from("user_roles").upsert(
+        { user_id: claimsData.user.id, role: "admin" },
+        { onConflict: "user_id,role" }
+      );
     }
 
     // ── LIST USERS ──
