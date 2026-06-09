@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Coins } from 'lucide-react';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
 interface FeaturePointInfo {
   feature: string;
@@ -20,16 +21,25 @@ const FEATURE_LABELS: Record<string, { ar: string; en: string }> = {
   proofreading: { ar: 'التدقيق والكشف الأكاديمي', en: 'Proofreading & Plagiarism' },
   summarizer: { ar: 'التلخيص', en: 'Summarizer' },
   exam_expert: { ar: 'خبير الامتحانات', en: 'Exam Expert' },
-  translator: { ar: 'الترجمة (مجاني)', en: 'Translation (Free)' },
+  translator: { ar: 'الترجمة', en: 'Translation' },
 };
 
-const FEATURE_COSTS: Record<string, number> = {
-  research: 2, thesis: 5, reports: 1, cv: 0.5, proofreading: 0.5, summarizer: 0.25, exam_expert: 0.01, translator: 0,
+// Maps UI feature key -> platform_settings cost key
+const COST_KEY: Record<string, string> = {
+  research: 'cost_research',
+  thesis: 'cost_thesis',
+  reports: 'cost_report',
+  cv: 'cost_cv',
+  proofreading: 'cost_proofread',
+  summarizer: 'cost_summarize',
+  exam_expert: 'cost_exam',
+  translator: 'cost_translate',
 };
 
 export const PointsPanel = () => {
   const { lang } = useLanguage();
   const { user } = useAuth();
+  const { settings } = usePlatformSettings();
   const [accountType, setAccountType] = useState<string>('unlimited');
   const [points, setPoints] = useState<FeaturePointInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +93,7 @@ export const PointsPanel = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {Object.entries(FEATURE_LABELS).map(([key, label]) => {
             const pt = points.find(p => p.feature === key);
-            const cost = FEATURE_COSTS[key];
+            const cost = Number((settings as any)?.[COST_KEY[key]] ?? 0);
             const isExpired = pt?.expires_at ? new Date(pt.expires_at) < new Date() : false;
             
             return (

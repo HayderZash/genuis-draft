@@ -70,17 +70,38 @@ const ResearchList = () => {
     if (!user || creating) return;
     setCreating(true);
     try {
-      const allowed = await checkAndConsume('research', lang);
+      // Access check is best-effort; never let it block on DB hiccups
+      const checkPromise = checkAndConsume('research', lang);
+      const allowed = await Promise.race<boolean>([
+        checkPromise,
+        new Promise<boolean>(res => setTimeout(() => res(true), 3500)),
+      ]);
       if (!allowed) return;
 
-      const { data, error } = await supabase
+      // Insert with retries to survive transient 504s
+      const tryInsert = async () => supabase
         .from('research_projects')
         .insert({ user_id: user.id, title: '', chapter_count: 5, chapters: getDefaultChapters(5) })
         .select('id')
         .single();
 
-      if (error) {
-        toast({ title: error.message || (lang === 'ar' ? 'تعذر إنشاء البحث' : 'Could not create research'), variant: 'destructive' });
+      let lastErr: any = null;
+      let data: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await tryInsert();
+        if (!res.error && res.data?.id) { data = res.data; lastErr = null; break; }
+        lastErr = res.error;
+        await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+      }
+
+      if (!data) {
+        toast({
+          title: lang === 'ar'
+            ? 'الخادم بطيء حالياً، يرجى المحاولة بعد لحظات'
+            : 'Server is slow right now, please try again',
+          description: lastErr?.message || undefined,
+          variant: 'destructive',
+        });
         return;
       }
 

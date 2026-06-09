@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { safeRetry, withTimeout } from '@/lib/retry';
 import { DEFAULT_PLATFORM_SETTINGS, getCachedPlatformSettings } from '@/hooks/usePlatformSettings';
+import { isAdminCached } from '@/hooks/useUserRole';
 
 // Map UI feature keys -> point cost keys in platform_settings
 const COST_KEY_MAP: Record<string, keyof typeof DEFAULT_PLATFORM_SETTINGS> = {
@@ -36,6 +37,9 @@ export const useFeatureAccess = () => {
     if (!user) return false;
     const isAr = lang === 'ar';
 
+    // Admin bypass — never block admins, never wait on DB
+    if (isAdminCached(user.id, user.email)) return true;
+
     // 1) Profile + access reads with retry+timeout. Fail-OPEN on errors.
     const profileRes = await safeRetry(
       async () => {
@@ -48,7 +52,7 @@ export const useFeatureAccess = () => {
         return data;
       },
       null,
-      { retries: 2, timeoutMs: 6000 },
+      { retries: 0, timeoutMs: 3000 },
     );
 
     const accessRes = await safeRetry(
@@ -63,7 +67,7 @@ export const useFeatureAccess = () => {
         return data;
       },
       null,
-      { retries: 2, timeoutMs: 6000 },
+      { retries: 0, timeoutMs: 3000 },
     );
 
     // Profile unavailable -> allow (don't block the user)
