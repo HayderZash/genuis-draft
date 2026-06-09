@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +31,7 @@ const Theses = () => {
   const { lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { checkAndConsume } = useFeatureAccess();
   const [list, setList] = useState<Thesis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,13 @@ const Theses = () => {
   };
 
   useEffect(() => { fetchList(); }, []);
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setCreateOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleCreate = async () => {
     if (!title.trim() || !field.trim()) {

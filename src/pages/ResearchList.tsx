@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +22,7 @@ const ResearchList = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { checkAndConsume } = useFeatureAccess();
   const [projects, setProjects] = useState<ResearchProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +66,13 @@ const ResearchList = () => {
   };
 
   useEffect(() => { fetchProjects(); /* eslint-disable-next-line */ }, [user?.id]);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && user && !creating) {
+      setSearchParams({}, { replace: true });
+      createProject();
+    }
+  }, [searchParams, user]);
 
   const createProject = async () => {
     if (!user || creating) return;
