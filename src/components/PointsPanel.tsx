@@ -93,7 +93,7 @@ export const PointsPanel = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {Object.entries(FEATURE_LABELS).map(([key, label]) => {
             const pt = points.find(p => p.feature === key);
-            const cost = FEATURE_COSTS[key];
+            const cost = Number((settings as any)?.[COST_KEY[key]] ?? 0);
             const isExpired = pt?.expires_at ? new Date(pt.expires_at) < new Date() : false;
             
             return (
