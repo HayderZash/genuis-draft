@@ -52,7 +52,7 @@ export const useFeatureAccess = () => {
         return data;
       },
       null,
-      { retries: 2, timeoutMs: 6000 },
+      { retries: 0, timeoutMs: 3000 },
     );
 
     const accessRes = await safeRetry(
@@ -67,7 +67,7 @@ export const useFeatureAccess = () => {
         return data;
       },
       null,
-      { retries: 2, timeoutMs: 6000 },
+      { retries: 0, timeoutMs: 3000 },
     );
 
     // Profile unavailable -> allow (don't block the user)
