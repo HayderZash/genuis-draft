@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { safeRetry, withTimeout } from '@/lib/retry';
 import { DEFAULT_PLATFORM_SETTINGS, getCachedPlatformSettings } from '@/hooks/usePlatformSettings';
+import { isAdminCached } from '@/hooks/useUserRole';
 
 // Map UI feature keys -> point cost keys in platform_settings
 const COST_KEY_MAP: Record<string, keyof typeof DEFAULT_PLATFORM_SETTINGS> = {
