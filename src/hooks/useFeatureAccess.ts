@@ -37,6 +37,9 @@ export const useFeatureAccess = () => {
     if (!user) return false;
     const isAr = lang === 'ar';
 
+    // Admin bypass — never block admins, never wait on DB
+    if (isAdminCached(user.id, user.email)) return true;
+
     // 1) Profile + access reads with retry+timeout. Fail-OPEN on errors.
     const profileRes = await safeRetry(
       async () => {
