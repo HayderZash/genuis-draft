@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -137,15 +137,46 @@ const Dashboard = () => {
     return icons[type] || FileText;
   };
 
+  const navigateToFeatureList = (featureKey: string) => {
+    const routes: Record<string, string> = {
+      research: '/research',
+      thesis: '/theses',
+      report: '/reports',
+      exam: '/exam-expert',
+      proofreading: '/proofreading',
+      cv: '/cvs',
+      summarize: '/summarizer',
+      translate: '/translator',
+    };
+    navigate(routes[featureKey] || '/');
+  };
+
+  const handleQuickCreate = (featureKey: string, e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+
+    const createActions: Record<string, () => void> = {
+      research: () => navigate('/research?create=1'),
+      thesis: () => navigate('/theses?new=1'),
+      report: () => navigate('/reports?new=1'),
+      exam: () => navigate('/exam-expert'),
+      proofreading: () => navigate('/proofreading'),
+      cv: () => navigate('/cvs?new=1'),
+      summarize: () => navigate('/summarizer'),
+      translate: () => navigate('/translator'),
+    };
+
+    createActions[featureKey]?.();
+  };
+
   const features = [
-    { key: 'research', icon: FileText, title: lang === 'ar' ? 'البحوث الأكاديمية' : 'Academic Research', onClick: () => navigate('/research') },
-    { key: 'thesis', icon: GraduationCap, title: lang === 'ar' ? 'رسائل الدراسات العليا' : 'Graduate Theses', onClick: () => navigate('/theses'), locked: isFree },
-    { key: 'report', icon: FileSpreadsheet, title: lang === 'ar' ? 'التقارير العلمية' : 'Scientific Reports', onClick: () => navigate('/reports') },
-    { key: 'exam', icon: ClipboardList, title: lang === 'ar' ? 'خبير الامتحانات' : 'Exam Expert', onClick: () => navigate('/exam-expert') },
-    { key: 'proofreading', icon: ShieldCheck, title: lang === 'ar' ? 'التدقيق والكشف الأكاديمي' : 'Academic Proofreading', onClick: () => navigate('/proofreading'), locked: isFree },
-    { key: 'cv', icon: UserCircle, title: lang === 'ar' ? 'السيرة الذاتية' : 'CV Builder', onClick: () => navigate('/cvs'), locked: isFree },
-    { key: 'summarize', icon: BookOpen, title: lang === 'ar' ? 'تلخيص النصوص' : 'Summarizer', onClick: () => navigate('/summarizer') },
-    { key: 'translate', icon: Languages, title: lang === 'ar' ? 'الترجمة الأكاديمية' : 'Translation', onClick: () => navigate('/translator') },
+    { key: 'research', icon: FileText, title: lang === 'ar' ? 'البحوث الأكاديمية' : 'Academic Research' },
+    { key: 'thesis', icon: GraduationCap, title: lang === 'ar' ? 'رسائل الدراسات العليا' : 'Graduate Theses', locked: isFree },
+    { key: 'report', icon: FileSpreadsheet, title: lang === 'ar' ? 'التقارير العلمية' : 'Scientific Reports' },
+    { key: 'exam', icon: ClipboardList, title: lang === 'ar' ? 'خبير الامتحانات' : 'Exam Expert' },
+    { key: 'proofreading', icon: ShieldCheck, title: lang === 'ar' ? 'التدقيق والكشف الأكاديمي' : 'Academic Proofreading', locked: isFree },
+    { key: 'cv', icon: UserCircle, title: lang === 'ar' ? 'السيرة الذاتية' : 'CV Builder', locked: isFree },
+    { key: 'summarize', icon: BookOpen, title: lang === 'ar' ? 'تلخيص النصوص' : 'Summarizer' },
+    { key: 'translate', icon: Languages, title: lang === 'ar' ? 'الترجمة الأكاديمية' : 'Translation' },
   ];
 
   const filtered = items.filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()));
@@ -201,7 +232,7 @@ const Dashboard = () => {
                 <Card
                   key={f.key}
                   className={`group cursor-pointer border-border/40 ${color.hover} transition-all duration-200 hover:shadow-md relative overflow-hidden`}
-                  onClick={f.onClick}
+                  onClick={() => navigateToFeatureList(f.key)}
                 >
                   {f.locked && (
                     <div className="absolute top-2 end-2">
@@ -218,6 +249,16 @@ const Dashboard = () => {
                     <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
                       {desc ? desc[lang as 'ar' | 'en'] : ''}
                     </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-1 h-8 gap-1 px-3 text-xs"
+                      onClick={(e) => handleQuickCreate(f.key, e)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>{lang === 'ar' ? 'إنشاء' : 'Create'}</span>
+                    </Button>
                   </CardContent>
                 </Card>
               );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,7 @@ const CVBuilder = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { checkAndConsume } = useFeatureAccess();
   const [cvs, setCVs] = useState<CVData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +95,13 @@ const CVBuilder = () => {
   };
 
   useEffect(() => { fetchCVs(); }, []);
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const addExperience = () => {
     setExperiences([...experiences, { job_title: '', company: '', start_date: '', end_date: '', is_current: false, description: '' }]);
