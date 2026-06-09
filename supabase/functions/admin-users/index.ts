@@ -98,6 +98,11 @@ Deno.serve(async (req) => {
 
     // ── LIST USERS ──
     if (action === "list-users") {
+      const authUsersPromise = Promise.race([
+        adminClient.auth.admin.listUsers({ perPage: 1000 }),
+        new Promise<any>((resolve) => setTimeout(() => resolve({ data: { users: [] } }), 2500)),
+      ]);
+
       const [profilesRes, rolesRes, featureAccessRes, featurePointsRes] = await Promise.all([
         adminClient.from("profiles").select("*").order("created_at", { ascending: false }),
         adminClient.from("user_roles").select("*"),
@@ -109,8 +114,11 @@ Deno.serve(async (req) => {
       const roles = rolesRes.data || [];
       const featureAccess = featureAccessRes.data || [];
       const featurePoints = featurePointsRes.data || [];
+      const authUsersRes = await authUsersPromise;
+      const authUsers = authUsersRes?.data?.users || [];
 
       const enriched = (profiles || []).map((p: any) => {
+        const authUser = authUsers.find((u: any) => u.id === p.user_id);
         const userRoles = (roles || []).filter((r: any) => r.user_id === p.user_id);
         const userFA: Record<string, boolean> = {};
         (featureAccess || []).filter((f: any) => f.user_id === p.user_id).forEach((f: any) => { userFA[f.feature] = f.is_enabled; });
@@ -119,7 +127,7 @@ Deno.serve(async (req) => {
 
         return {
           ...p,
-          email: p.user_id === claimsData.user.id ? userEmail : "",
+          email: authUser?.email || (p.user_id === claimsData.user.id ? userEmail : ""),
           roles: userRoles.map((r: any) => r.role),
           feature_access: userFA,
           feature_points: userFP,
