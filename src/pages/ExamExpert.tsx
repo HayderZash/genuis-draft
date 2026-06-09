@@ -10,10 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ClipboardList, Loader2, Sparkles, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Loader as Loader2, Sparkles, Trash2, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserPlan } from '@/hooks/useUserPlan';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
 interface ExamRow {
   id: string;
@@ -37,6 +39,9 @@ const ExamExpert = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { checkAndConsume } = useFeatureAccess();
+  const { isFree } = useUserPlan();
+  const { settings } = usePlatformSettings();
+  const maxQuestions = isFree ? (settings.plan_free_exam_questions || 5) : 100;
 
   const [list, setList] = useState<ExamRow[]>([]);
   const [title, setTitle] = useState('');
@@ -49,7 +54,7 @@ const ExamExpert = () => {
   const [current, setCurrent] = useState<ExamRow | null>(null);
 
   const fetchList = async () => {
-    const { data } = await supabase.from('exam_papers').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('exam_papers').select('*').eq('user_id', user!.id).order('created_at', { ascending: false });
     if (data) setList(data as any);
   };
 
@@ -72,6 +77,16 @@ const ExamExpert = () => {
   const handleGenerate = async () => {
     if (!sourceText.trim() || count < 1 || types.length === 0) {
       toast({ title: lang === 'ar' ? 'أكمل جميع الحقول' : 'Complete all fields', variant: 'destructive' });
+      return;
+    }
+    if (isFree && count > maxQuestions) {
+      toast({
+        title: lang === 'ar'
+          ? `الخطة المجانية محدودة بـ ${maxQuestions} أسئلة. تواصل عبر صفحة الاشتراكات للترقية.`
+          : `Free plan is limited to ${maxQuestions} questions. Upgrade for more.`,
+        variant: 'destructive',
+      });
+      setCount(maxQuestions);
       return;
     }
     // Cost is enforced server-side via checkAndConsume; here we display only.
@@ -168,8 +183,9 @@ const ExamExpert = () => {
 
             <div className="space-y-2">
               <Label>{lang === 'ar' ? 'عدد الأسئلة' : 'Question Count'} ({count})</Label>
-              <Input type="number" min={1} max={100} value={count} onChange={e => setCount(parseInt(e.target.value) || 1)} />
+              <Input type="number" min={1} max={maxQuestions} value={count} onChange={e => setCount(Math.min(parseInt(e.target.value) || 1, maxQuestions))} />
               <p className="text-xs text-muted-foreground">
+                {isFree && (lang === 'ar' ? `الحد المجاني: ${maxQuestions} أسئلة. ` : `Free max: ${maxQuestions} questions. `)}
                 {lang === 'ar' ? `التكلفة: ${(count * 0.01).toFixed(2)} نقطة` : `Cost: ${(count * 0.01).toFixed(2)} points`}
               </p>
             </div>

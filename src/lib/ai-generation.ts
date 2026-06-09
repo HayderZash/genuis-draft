@@ -3,6 +3,7 @@ import type { TranslationKey } from '@/i18n/translations';
 import { supabase } from '@/integrations/supabase/client';
 import type { AIProvider } from '@/components/SettingsDialog';
 import { getMergeConfig, getProviderKey } from '@/components/SettingsDialog';
+import { getAssistantProviderPayload } from '@/lib/assistant-provider';
 
 interface GenerateParams {
   apiKey: string;
@@ -44,7 +45,7 @@ async function callAI(
   temperature: number,
   retries = 3
 ): Promise<string> {
-  // Merge mode first
+  // Try user's merge mode first
   const mergeConfig = getMergeConfig();
   if (mergeConfig.enabled && mergeConfig.providers.length > 0) {
     try {
@@ -66,10 +67,10 @@ async function callAI(
     }
   }
 
-  // Single user-selected provider (if configured)
-  const userProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'lovable' as any;
-  const userKey = getProviderKey(userProvider);
-  if (userKey && userProvider !== 'lovable' as any) {
+  // Try user's single provider
+  const userProvider = (localStorage.getItem('ai_provider') as AIProvider) || null;
+  const userKey = userProvider ? getProviderKey(userProvider) : '';
+  if (userKey && userProvider) {
     try {
       const { data, error } = await supabase.functions.invoke('ai-proxy', {
         body: { provider: userProvider, apiKey: userKey, systemPrompt, userPrompt, maxTokens, temperature },
@@ -78,9 +79,26 @@ async function callAI(
         console.log(`[AI] User provider (${userProvider}) success`);
         return data.content;
       }
-      console.warn(`[AI] User provider (${userProvider}) failed, fallback to Lovable`);
+      console.warn(`[AI] User provider (${userProvider}) failed`);
     } catch (e) {
       console.warn(`[AI] User provider exception, fallback:`, e);
+    }
+  }
+
+  // Try admin default keys
+  const defaultProvider = getAssistantProviderPayload();
+  if (defaultProvider.provider && defaultProvider.apiKey) {
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-proxy', {
+        body: { provider: defaultProvider.provider, apiKey: defaultProvider.apiKey, systemPrompt, userPrompt, maxTokens, temperature },
+      });
+      if (!error && data?.content) {
+        console.log(`[AI] Default admin provider (${defaultProvider.provider}) success`);
+        return data.content;
+      }
+      console.warn(`[AI] Default provider failed, fallback to Lovable`);
+    } catch (e) {
+      console.warn(`[AI] Default provider exception, fallback:`, e);
     }
   }
 

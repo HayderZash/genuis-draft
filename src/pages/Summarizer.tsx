@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, BookOpen, Copy } from 'lucide-react';
+import { ArrowLeft, Loader as Loader2, BookOpen, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
@@ -48,7 +48,7 @@ const Summarizer = () => {
       const { data, error } = await supabase.functions.invoke('summarize', {
         body: { text: text.trim(), language, targetLength },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'AI error');
       setSummary(data?.summary || '');
     } catch (err: any) {
       toast({ title: err.message || 'Error', variant: 'destructive' });

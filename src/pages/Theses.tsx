@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Plus, ArrowLeft, GraduationCap, Trash2, Loader2, Sparkles, Eye } from 'lucide-react';
+import { Plus, ArrowLeft, GraduationCap, Trash2, Loader as Loader2, Sparkles, Eye } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
@@ -49,7 +49,7 @@ const Theses = () => {
   const [refCount, setRefCount] = useState(30);
 
   const fetchList = async () => {
-    const { data } = await supabase.from('theses').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('theses').select('*').eq('user_id', user!.id).order('created_at', { ascending: false });
     if (data) setList(data as any);
     setLoading(false);
   };

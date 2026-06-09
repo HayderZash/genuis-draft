@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Layers } from 'lucide-react';
+import { Eye, EyeOff, Layers, Shield, KeyRound } from 'lucide-react';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -36,25 +37,19 @@ export type AIProvider =
   | 'dalle3';
 
 export const ALL_PROVIDERS: { value: AIProvider; label: string; labelAr: string; placeholder: string; group?: string }[] = [
-  // OpenAI family
   { value: 'openai', label: 'OpenAI (GPT-4o-mini)', labelAr: 'OpenAI (GPT-4o-mini)', placeholder: 'sk-...', group: 'OpenAI' },
-  { value: 'dalle3', label: 'OpenAI (DALL·E 3 — Image)', labelAr: 'OpenAI DALL·E 3 (صور)', placeholder: 'sk-...', group: 'OpenAI' },
-  // Google
+  { value: 'dalle3', label: 'OpenAI (DALL-E 3)', labelAr: 'OpenAI DALL-E 3', placeholder: 'sk-...', group: 'OpenAI' },
   { value: 'gemini', label: 'Google Gemini 2.5 Flash', labelAr: 'Google Gemini 2.5 Flash', placeholder: 'AI...', group: 'Google' },
   { value: 'gemini_pro', label: 'Google Gemini 2.5 Pro', labelAr: 'Google Gemini 2.5 Pro', placeholder: 'AI...', group: 'Google' },
-  // DeepSeek
   { value: 'deepseek_chat', label: 'DeepSeek Chat', labelAr: 'DeepSeek Chat', placeholder: 'sk-...', group: 'DeepSeek' },
   { value: 'deepseek_reasoner', label: 'DeepSeek Reasoner', labelAr: 'DeepSeek Reasoner', placeholder: 'sk-...', group: 'DeepSeek' },
-  // Mistral family
   { value: 'mistral', label: 'Mistral Large', labelAr: 'Mistral Large', placeholder: 'api-...', group: 'Mistral' },
   { value: 'mistral_medium', label: 'Mistral Medium Latest', labelAr: 'Mistral Medium', placeholder: 'api-...', group: 'Mistral' },
   { value: 'codestral', label: 'Codestral Latest', labelAr: 'Codestral Latest', placeholder: 'api-...', group: 'Mistral' },
   { value: 'devstral', label: 'Devstral Latest', labelAr: 'Devstral Latest', placeholder: 'api-...', group: 'Mistral' },
-  // Cohere family
   { value: 'cohere_command_vision', label: 'Cohere Command-A Vision', labelAr: 'Cohere Command Vision', placeholder: 'co-...', group: 'Cohere' },
   { value: 'cohere_rerank', label: 'Cohere Rerank v4 (Pro)', labelAr: 'Cohere Rerank v4', placeholder: 'co-...', group: 'Cohere' },
   { value: 'cohere_embed', label: 'Cohere Embed English v3', labelAr: 'Cohere Embed v3', placeholder: 'co-...', group: 'Cohere' },
-  // Others
   { value: 'groq', label: 'Groq Cloud (Llama 3.3)', labelAr: 'Groq Cloud', placeholder: 'gsk_...', group: 'Other' },
   { value: 'orbit', label: 'Orbit Provider', labelAr: 'Orbit Provider', placeholder: 'sk-orbit-...', group: 'Other' },
   { value: 'openrouter', label: 'OpenRouter', labelAr: 'OpenRouter', placeholder: 'sk-or-...', group: 'Other' },
@@ -94,6 +89,7 @@ export function getProviderKey(provider: AIProvider): string {
 export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
+  const { isAdmin } = useUserRole();
   const { saveMultipleSettings } = useUserSettings();
 
   const [provider, setProvider] = useState<AIProvider>('openai');
@@ -105,7 +101,6 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
   const [mergeKeys, setMergeKeys] = useState<Record<AIProvider, string>>({} as any);
   const [showMergeKeys, setShowMergeKeys] = useState<Record<AIProvider, boolean>>({} as any);
 
-  // Load only ONCE when dialog opens; do NOT depend on syncToLocal (it changes every render and causes a reset loop that wipes typed input).
   useEffect(() => {
     if (!open) return;
     const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'openai';
@@ -122,7 +117,6 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
     });
     setMergeKeys(keys as any);
     setShowMergeKeys(shows as any);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleProviderChange = (val: AIProvider) => {
@@ -154,15 +148,12 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
 
     try {
       await saveMultipleSettings(settings);
-    } catch {
-      // local cache already updated to avoid losing keys on slow backend
-    }
+    } catch {}
 
     toast({ title: t('apiKeySaved') });
     onOpenChange(false);
   };
 
-  // Group providers
   const groupedProviders = ALL_PROVIDERS.reduce((acc, p) => {
     const g = p.group || 'Other';
     if (!acc[g]) acc[g] = [];
@@ -170,10 +161,40 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
     return acc;
   }, {} as Record<string, typeof ALL_PROVIDERS>);
 
+  // Non-admin users: show a simple message
+  if (!isAdmin) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{t('settings')}</DialogTitle></DialogHeader>
+          <div className="text-center py-6 space-y-4">
+            <div className="p-4 rounded-xl bg-muted/50">
+              <KeyRound className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                {isAr
+                  ? 'مزود الذكاء الاصطناعي يتم إدارته من قبل المدير. يمكنك استخدام جميع الميزات المتاحة لحسابك مباشرة.'
+                  : 'The AI provider is managed by the admin. You can use all features available for your account directly.'}
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {isAr ? 'إغلاق' : 'Close'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Admin: full API configuration
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{t('settings')}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            {isAr ? 'إعدادات المزود (المدير فقط)' : 'Provider Settings (Admin Only)'}
+          </DialogTitle>
+        </DialogHeader>
         <div className="space-y-4">
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div className="flex items-center gap-2">
@@ -232,7 +253,7 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                 </div>
               ))}
               <p className="text-xs text-muted-foreground">
-                {isAr ? 'سيتم إرسال الطلب لكل المزودين المفعلين بالتوازي ودمج النتائج في نص واحد متكامل.' : 'Requests will be sent to all enabled providers in parallel and results merged into one coherent text.'}
+                {isAr ? 'سيتم إرسال الطلب لكل المزودين المفعلين بالتوازي ودمج النتائج.' : 'Requests will be sent to all enabled providers in parallel and results merged.'}
               </p>
             </div>
           ) : (
@@ -259,11 +280,11 @@ export const SettingsDialog = ({ open, onOpenChange }: SettingsDialogProps) => {
                   <Input
                     type={showKey ? 'text' : 'password'}
                     value={apiKey}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setApiKey(value);
-                        localStorage.setItem(PROVIDER_KEY_MAP[provider], value);
-                      }}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setApiKey(value);
+                      localStorage.setItem(PROVIDER_KEY_MAP[provider], value);
+                    }}
                     placeholder={ALL_PROVIDERS.find(p => p.value === provider)?.placeholder || ''}
                     className="pe-10"
                   />

@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ArrowLeft, FileText, Trash2, Loader2 } from 'lucide-react';
+import { Plus, ArrowLeft, FileText, Trash2, Loader as Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getDefaultChapters } from '@/pages/Dashboard';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
@@ -103,18 +103,30 @@ const ResearchList = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-4xl py-8 px-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      <Button variant="ghost" onClick={() => navigate('/')} className="gap-1 mb-6">
-        <ArrowLeft className="h-4 w-4" /> {t('backToDashboard')}
-      </Button>
-
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">{t('myResearch')}</h2>
-        <Button onClick={createProject} className="gap-2" disabled={creating}>
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          {t('newResearch')}
-        </Button>
+    <div className="min-h-screen bg-background" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      <div className="relative overflow-hidden border-b border-border/50">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-cyan-500/5" />
+        <div className="container mx-auto max-w-4xl px-4 py-6 relative">
+          <Button variant="ghost" onClick={() => navigate('/')} className="gap-1 mb-3 -ms-2">
+            <ArrowLeft className="h-4 w-4" /> {t('backToDashboard')}
+          </Button>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-500/10"><FileText className="h-6 w-6 text-blue-600" /></div>
+              <div>
+                <h2 className="text-2xl font-bold">{t('myResearch')}</h2>
+                <p className="text-sm text-muted-foreground">{lang === 'ar' ? 'البحوث الأكاديمية الخاصة بك' : 'Your academic research projects'}</p>
+              </div>
+            </div>
+            <Button onClick={createProject} className="gap-2" disabled={creating}>
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {t('newResearch')}
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <div className="container mx-auto max-w-4xl px-4 py-6">
 
       {loading && projects.length === 0 ? (
         <div className="text-center text-muted-foreground py-12">{lang === 'ar' ? 'جاري التحميل...' : 'Loading...'}</div>
@@ -147,6 +159,7 @@ const ResearchList = () => {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 };

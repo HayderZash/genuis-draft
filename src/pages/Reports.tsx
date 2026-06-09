@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader2, Sparkles, Download, X } from 'lucide-react';
+import { Plus, ArrowLeft, FileSpreadsheet, Trash2, Loader as Loader2, Sparkles, Download, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
@@ -60,6 +60,7 @@ const Reports = () => {
     const { data } = await supabase
       .from('reports')
       .select('id, title, status, report_type, created_at, content, research_language')
+      .eq('user_id', user!.id)
       .order('updated_at', { ascending: false });
     if (data) setReports(data);
     setLoading(false);
@@ -179,17 +180,29 @@ const Reports = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-4xl py-8 px-4">
-      <Button variant="ghost" onClick={() => navigate('/')} className="gap-1 mb-6">
-        <ArrowLeft className="h-4 w-4" /> {t('backToDashboard')}
-      </Button>
-
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">{t('myReports')}</h2>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-          <Plus className="h-4 w-4" /> {t('newReport')}
-        </Button>
+    <div className="min-h-screen bg-background" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      <div className="relative overflow-hidden border-b border-border/50">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-green-500/5" />
+        <div className="container mx-auto max-w-4xl px-4 py-6 relative">
+          <Button variant="ghost" onClick={() => navigate('/')} className="gap-1 mb-3 -ms-2">
+            <ArrowLeft className="h-4 w-4" /> {t('backToDashboard')}
+          </Button>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10"><FileSpreadsheet className="h-6 w-6 text-emerald-600" /></div>
+              <div>
+                <h2 className="text-2xl font-bold">{t('myReports')}</h2>
+                <p className="text-sm text-muted-foreground">{lang === 'ar' ? 'التقارير العلمية والمختبرية' : 'Scientific & lab reports'}</p>
+              </div>
+            </div>
+            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+              <Plus className="h-4 w-4" /> {t('newReport')}
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <div className="container mx-auto max-w-4xl px-4 py-6">
 
       {showForm && (
         <Card className="mb-6">
@@ -328,6 +341,7 @@ const Reports = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

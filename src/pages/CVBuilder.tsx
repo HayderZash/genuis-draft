@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, ArrowLeft, UserCircle, Trash2, Loader2, Sparkles, X, Download } from 'lucide-react';
+import { Plus, ArrowLeft, CircleUser as UserCircle, Trash2, Loader as Loader2, Sparkles, X, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx';
@@ -87,6 +87,7 @@ const CVBuilder = () => {
     const { data } = await supabase
       .from('cvs')
       .select('id, full_name, status, created_at, generated_content')
+      .eq('user_id', user!.id)
       .order('updated_at', { ascending: false });
     if (data) setCVs(data);
     setLoading(false);

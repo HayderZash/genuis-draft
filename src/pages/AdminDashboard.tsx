@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Loader2, UserPlus, Shield, Clock, Trash2, Pencil, Phone, Send, Instagram, Save, Zap, DollarSign } from 'lucide-react';
+import { ArrowLeft, Loader as Loader2, UserPlus, Shield, Clock, Trash2, Pencil, Phone, Send, Instagram, Save, Zap, DollarSign, KeyRound, Mail, Layers } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePlatformSettings, DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '@/hooks/usePlatformSettings';
@@ -84,9 +84,9 @@ const AdminDashboard = () => {
   const [editPointsExpiry, setEditPointsExpiry] = useState('');
 
   // Contact settings
-  const [contactPhone, setContactPhone] = useState('');
+  const [contactWhatsApp, setContactWhatsApp] = useState('');
   const [contactTelegram, setContactTelegram] = useState('');
-  const [contactInstagram, setContactInstagram] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [savingContact, setSavingContact] = useState(false);
 
   // Pricing/plans editable copy of platform settings
@@ -126,9 +126,9 @@ const AdminDashboard = () => {
       clearTimeout(timer);
       if (error || !data) return;
       data.forEach((s: any) => {
-        if (s.key === 'contact_phone') setContactPhone(s.value);
+        if (s.key === 'contact_whatsapp') setContactWhatsApp(s.value);
         if (s.key === 'contact_telegram') setContactTelegram(s.value);
-        if (s.key === 'contact_instagram') setContactInstagram(s.value);
+        if (s.key === 'contact_email') setContactEmail(s.value);
       });
     } catch { /* silent */ }
   };
@@ -149,11 +149,13 @@ const AdminDashboard = () => {
       await callAdmin({
         action: 'update-settings',
         settings: [
-          { key: 'contact_phone', value: contactPhone },
+          { key: 'contact_whatsapp', value: contactWhatsApp },
           { key: 'contact_telegram', value: contactTelegram },
-          { key: 'contact_instagram', value: contactInstagram },
+          { key: 'contact_email', value: contactEmail },
         ]
       });
+      try { localStorage.setItem('platform_settings_cache_v1', JSON.stringify({ ...platformSettings, contact_whatsapp: contactWhatsApp, contact_telegram: contactTelegram, contact_email: contactEmail })); } catch {}
+      await refreshPlatform();
       toast({ title: isAr ? 'تم حفظ معلومات التواصل' : 'Contact info saved' });
     } catch (err: any) {
       toast({ title: err.message, variant: 'destructive' });
@@ -385,9 +387,92 @@ const AdminDashboard = () => {
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
           <TabsTrigger value="users">{isAr ? 'المستخدمون' : 'Users'}</TabsTrigger>
+          <TabsTrigger value="api-keys">{isAr ? 'مفاتيح AI' : 'AI Keys'}</TabsTrigger>
           <TabsTrigger value="pricing">{isAr ? 'التسعير والخطط' : 'Pricing & Plans'}</TabsTrigger>
           <TabsTrigger value="contact">{isAr ? 'حسابات التواصل' : 'Contact Info'}</TabsTrigger>
         </TabsList>
+
+        {/* API Keys Tab */}
+        <TabsContent value="api-keys">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" /> {isAr ? 'مفاتيح AI الافتراضية' : 'Default AI Keys'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {isAr
+                  ? 'هذه المفاتيح تُستخدم تلقائياً للحسابات التي لم تُضبط مفاتيحها الخاصة. اضبط المزود الافتراضي ومفتاحه هنا.'
+                  : 'These keys are used automatically for accounts without their own API keys. Set the default provider and key here.'}
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{isAr ? 'المزود الافتراضي' : 'Default Provider'}</Label>
+                  <Select value={pricing.default_ai_provider || ''} onValueChange={v => setPricing({ ...pricing, default_ai_provider: v })}>
+                    <SelectTrigger><SelectValue placeholder={isAr ? 'اختر مزوداً' : 'Select provider'} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="openai">OpenAI</SelectItem>
+                      <SelectItem value="gemini">Gemini Flash</SelectItem>
+                      <SelectItem value="gemini_pro">Gemini Pro</SelectItem>
+                      <SelectItem value="deepseek_chat">DeepSeek Chat</SelectItem>
+                      <SelectItem value="deepseek_reasoner">DeepSeek Reasoner</SelectItem>
+                      <SelectItem value="groq">Groq</SelectItem>
+                      <SelectItem value="mistral">Mistral</SelectItem>
+                      <SelectItem value="cohere_command_vision">Cohere</SelectItem>
+                      <SelectItem value="openrouter">OpenRouter</SelectItem>
+                      <SelectItem value="siliconflow">SiliconFlow</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{isAr ? 'مفتاح API الافتراضي' : 'Default API Key'}</Label>
+                  <Input type="password" value={pricing.default_ai_api_key || ''} onChange={e => setPricing({ ...pricing, default_ai_api_key: e.target.value })} placeholder="sk-..." dir="ltr" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">{isAr ? 'تفعيل الدمج الافتراضي' : 'Enable Default Merge'}</p>
+                    <p className="text-xs text-muted-foreground">{isAr ? 'دمج نتائج عدة مزودين' : 'Merge results from multiple providers'}</p>
+                  </div>
+                </div>
+                <Switch checked={pricing.default_merge_enabled === 'true'} onCheckedChange={v => setPricing({ ...pricing, default_merge_enabled: v ? 'true' : 'false' })} />
+              </div>
+              {pricing.default_merge_enabled === 'true' && (
+                <div className="space-y-3">
+                  <Label>{isAr ? 'مفاتيح المزودين الإضافية' : 'Additional Provider Keys'}</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {([
+                      ['default_key_openai', 'OpenAI', 'sk-...'],
+                      ['default_key_gemini', 'Gemini Flash', 'AI...'],
+                      ['default_key_gemini_pro', 'Gemini Pro', 'AI...'],
+                      ['default_key_deepseek_chat', 'DeepSeek Chat', 'sk-...'],
+                      ['default_key_groq', 'Groq', 'gsk_...'],
+                      ['default_key_mistral', 'Mistral', 'api-...'],
+                      ['default_key_cohere', 'Cohere', 'co-...'],
+                      ['default_key_openrouter', 'OpenRouter', 'sk-or-...'],
+                      ['default_key_siliconflow', 'SiliconFlow', 'sf-...'],
+                    ] as const).map(([k, label, placeholder]) => (
+                      <div key={k} className="space-y-1">
+                        <Label className="text-xs">{label}</Label>
+                        <Input type="password" value={(pricing as any)[k] || ''} onChange={e => setPricing({ ...pricing, [k]: e.target.value })} placeholder={placeholder} dir="ltr" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{isAr ? 'قائمة المزودين المدمجين (JSON)' : 'Merge Providers List (JSON)'}</Label>
+                    <Input value={pricing.default_merge_providers || '[]'} onChange={e => setPricing({ ...pricing, default_merge_providers: e.target.value })} placeholder='["gemini","openai"]' dir="ltr" />
+                    <p className="text-xs text-muted-foreground">{isAr ? 'مثال: ["gemini","openai","deepseek_chat"]' : 'Example: ["gemini","openai","deepseek_chat"]'}</p>
+                  </div>
+                </div>
+              )}
+              <Button onClick={handleSavePricing} disabled={savingPricing} className="gap-1">
+                {savingPricing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isAr ? 'حفظ مفاتيح AI' : 'Save AI Keys'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Pricing Tab */}
         <TabsContent value="pricing">
@@ -486,15 +571,15 @@ const AdminDashboard = () => {
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2"><Phone className="h-4 w-4" /> {isAr ? 'رقم الواتساب' : 'WhatsApp Number'}</Label>
-                <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="+964..." dir="ltr" />
+                <Input value={contactWhatsApp} onChange={e => setContactWhatsApp(e.target.value)} placeholder="0786..." dir="ltr" />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-2"><Send className="h-4 w-4" /> {isAr ? 'رابط التليكرام' : 'Telegram Link'}</Label>
-                <Input value={contactTelegram} onChange={e => setContactTelegram(e.target.value)} placeholder="https://t.me/..." dir="ltr" />
+                <Label className="flex items-center gap-2"><Send className="h-4 w-4" /> {isAr ? 'معرّف التليكرام' : 'Telegram Username'}</Label>
+                <Input value={contactTelegram} onChange={e => setContactTelegram(e.target.value)} placeholder="HayderZash" dir="ltr" />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-2"><Instagram className="h-4 w-4" /> {isAr ? 'رابط الانستغرام' : 'Instagram Link'}</Label>
-                <Input value={contactInstagram} onChange={e => setContactInstagram(e.target.value)} placeholder="https://instagram.com/..." dir="ltr" />
+                <Label className="flex items-center gap-2"><Mail className="h-4 w-4" /> {isAr ? 'البريد الإلكتروني' : 'Email'}</Label>
+                <Input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="email@example.com" dir="ltr" />
               </div>
               <Button onClick={handleSaveContact} disabled={savingContact} className="gap-1">
                 {savingContact ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

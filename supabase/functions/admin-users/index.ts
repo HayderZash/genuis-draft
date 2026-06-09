@@ -210,7 +210,10 @@ Deno.serve(async (req) => {
     if (action === "update-settings") {
       const { settings } = body;
       for (const s of settings) {
-        await adminClient.from("platform_settings").update({ value: s.value, updated_at: new Date().toISOString() }).eq("key", s.key);
+        await adminClient.from("platform_settings").upsert(
+          { key: s.key, value: s.value, updated_at: new Date().toISOString() },
+          { onConflict: "key" }
+        );
       }
       return json({ success: true });
     }

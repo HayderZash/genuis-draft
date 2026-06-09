@@ -9,12 +9,12 @@ const CACHE_PREFIX = 'user_plan_cache_';
 export const useUserPlan = () => {
   const { user } = useAuth();
   const [accountType, setAccountType] = useState<AccountType>(() => {
-    if (!user) return 'unlimited';
+    if (!user) return 'free';
     try {
       const cached = localStorage.getItem(CACHE_PREFIX + user.id);
       if (cached) return cached as AccountType;
     } catch {}
-    return 'unlimited';
+    return 'free';
   });
   const [loading, setLoading] = useState(false);
 
@@ -30,7 +30,7 @@ export const useUserPlan = () => {
           .eq('user_id', user.id)
           .maybeSingle();
         if (aborted) return;
-        const t = (data?.account_type as AccountType) || 'unlimited';
+        const t = (data?.account_type as AccountType) || 'free';
         setAccountType(t);
         try { localStorage.setItem(CACHE_PREFIX + user.id, t); } catch {}
       } catch {

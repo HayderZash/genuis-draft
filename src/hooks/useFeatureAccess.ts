@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { safeRetry, withTimeout } from '@/lib/retry';
-import { DEFAULT_PLATFORM_SETTINGS } from '@/hooks/usePlatformSettings';
+import { DEFAULT_PLATFORM_SETTINGS, getCachedPlatformSettings } from '@/hooks/usePlatformSettings';
 
 // Map UI feature keys -> point cost keys in platform_settings
 const COST_KEY_MAP: Record<string, keyof typeof DEFAULT_PLATFORM_SETTINGS> = {
@@ -20,13 +20,7 @@ const COST_KEY_MAP: Record<string, keyof typeof DEFAULT_PLATFORM_SETTINGS> = {
 // Features that are completely LOCKED on the free plan
 const FREE_LOCKED = new Set(['thesis', 'proofreading', 'cv']);
 
-const getCachedSettings = () => {
-  try {
-    const c = localStorage.getItem('platform_settings_cache_v1');
-    if (c) return { ...DEFAULT_PLATFORM_SETTINGS, ...JSON.parse(c) };
-  } catch {}
-  return DEFAULT_PLATFORM_SETTINGS;
-};
+const getCachedSettings = getCachedPlatformSettings;
 
 const getCost = (feature: string): number => {
   const key = COST_KEY_MAP[feature];
@@ -129,6 +123,50 @@ export const useFeatureAccess = () => {
             title: isAr
               ? `الخطة المجانية تسمح بـ ${max} بحث فقط. يرجى الترقية.`
               : `Free plan allows only ${max} research project. Please upgrade.`,
+            variant: 'destructive',
+          });
+          return false;
+        }
+      }
+      // Report cap on free plan
+      if (feature === 'reports' || feature === 'report') {
+        const settings = getCachedSettings();
+        const maxReports = 1;
+        const { count } = await withTimeout(
+          supabase
+            .from('reports')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id) as any,
+          5000,
+          { count: null } as any,
+        );
+        if (typeof count === 'number' && count >= maxReports) {
+          toast({
+            title: isAr
+              ? 'الخطة المجانية تسمح بتقرير واحد فقط. يرجى الترقية.'
+              : 'Free plan allows only 1 report. Please upgrade.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+      }
+      // Exam questions cap on free plan
+      if (feature === 'exam_expert') {
+        const settings = getCachedSettings();
+        const maxExams = 1;
+        const { count } = await withTimeout(
+          supabase
+            .from('exam_papers')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id) as any,
+          5000,
+          { count: null } as any,
+        );
+        if (typeof count === 'number' && count >= maxExams) {
+          toast({
+            title: isAr
+              ? 'الخطة المجانية تسمح بامتحان واحد فقط. يرجى الترقية.'
+              : 'Free plan allows only 1 exam. Please upgrade.',
             variant: 'destructive',
           });
           return false;

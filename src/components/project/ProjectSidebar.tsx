@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChapterList } from './ChapterList';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader as Loader2, Sparkles } from 'lucide-react';
 import { getDefaultChapters } from '@/pages/Dashboard';
 import { useUserPlan } from '@/hooks/useUserPlan';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
@@ -193,11 +193,21 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         <div className="flex items-center gap-2">
           <Checkbox
             id="include_images"
-            checked={project.include_images || false}
-            onCheckedChange={(v) => onUpdate({ include_images: !!v })}
+            checked={isFree ? false : (project.include_images || false)}
+            onCheckedChange={(v) => {
+              if (isFree) {
+                toast({
+                  title: lang === 'ar' ? 'الصور متاحة في الخطط المدفوعة فقط' : 'Images available on paid plans only',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              onUpdate({ include_images: !!v });
+            }}
           />
-          <label htmlFor="include_images" className="text-sm cursor-pointer">
+          <label htmlFor="include_images" className={`text-sm cursor-pointer ${isFree ? 'text-muted-foreground' : ''}`}>
             {lang === 'ar' ? 'إضافة صور توضيحية مع عناوين' : 'Add illustrative images with captions'}
+            {isFree && <span className="text-xs text-amber-600 ms-1">({lang === 'ar' ? 'مدفوع' : 'Paid'})</span>}
           </label>
         </div>
         <div className="flex items-center gap-2">
@@ -212,7 +222,7 @@ export const ProjectSidebar = ({ project, onUpdate, onGenerate, generating, onRe
         </div>
       </div>
 
-      {project.include_images && (
+      {project.include_images && !isFree && (
         <div className="space-y-2">
           <Label>{lang === 'ar' ? 'جودة الصور' : 'Image Quality'}</Label>
           <Select value={project.image_quality || 'standard'} onValueChange={(v) => onUpdate({ image_quality: v })}>

@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { AIProvider } from '@/components/SettingsDialog';
 import { getMergeConfig, getProviderKey } from '@/components/SettingsDialog';
+import { getAssistantProviderPayload } from '@/lib/assistant-provider';
 
 interface ReportGenParams {
   title: string;
@@ -24,8 +25,8 @@ async function callAI(
   userPrompt: string,
   maxTokens: number
 ): Promise<string> {
+  // Try user's merge mode
   const mergeConfig = getMergeConfig();
-
   if (mergeConfig.enabled && mergeConfig.providers.length > 0) {
     const providers = mergeConfig.providers
       .map(p => ({ provider: p, apiKey: getProviderKey(p) }))
@@ -36,16 +37,31 @@ async function callAI(
       const { data, error } = await supabase.functions.invoke('ai-merge-proxy', {
         body: { providers, systemPrompt, userPrompt, maxTokens, temperature: 0.7, mergeLanguage: isAr ? 'ar' : 'en' },
       });
-      if (error) throw new Error(error.message || 'Merge proxy call failed');
-      if (data?.error) throw new Error(data.error);
-      return data?.content || '';
+      if (!error && data?.content) return data.content;
     }
   }
 
-  const { data, error } = await supabase.functions.invoke('ai-proxy', {
-    body: { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature: 0.7 },
-  });
+  // Try the provided provider/key
+  if (provider && apiKey) {
+    const { data, error } = await supabase.functions.invoke('ai-proxy', {
+      body: { provider, apiKey, systemPrompt, userPrompt, maxTokens, temperature: 0.7 },
+    });
+    if (!error && data?.content) return data.content;
+  }
 
+  // Fallback: try admin default keys
+  const defaults = getAssistantProviderPayload();
+  if (defaults.provider && defaults.apiKey) {
+    const { data, error } = await supabase.functions.invoke('ai-proxy', {
+      body: { provider: defaults.provider, apiKey: defaults.apiKey, systemPrompt, userPrompt, maxTokens, temperature: 0.7 },
+    });
+    if (!error && data?.content) return data.content;
+  }
+
+  // Final fallback: Lovable
+  const { data, error } = await supabase.functions.invoke('ai-proxy', {
+    body: { provider: 'lovable', apiKey: '', systemPrompt, userPrompt, maxTokens, temperature: 0.7 },
+  });
   if (error) throw new Error(error.message || 'AI proxy call failed');
   if (data?.error) throw new Error(data.error);
   return data?.content || '';

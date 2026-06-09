@@ -16,35 +16,40 @@ export const Navbar = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 items-center justify-between px-4 md:px-6">
-          <h1 className="text-lg font-bold text-primary">{t('appName')}</h1>
-          <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-background/60">
+        <div className="container max-w-6xl mx-auto flex h-14 items-center justify-between px-4 md:px-6">
+          <h1
+            className="text-lg font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigate('/')}
+          >
+            {t('appName')}
+          </h1>
+          <div className="flex items-center gap-1.5">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-              className="gap-1"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
             >
               <Globe className="h-4 w-4" />
-              {lang === 'ar' ? 'EN' : 'عربي'}
+              <span className="hidden sm:inline">{lang === 'ar' ? 'EN' : 'عربي'}</span>
             </Button>
             {user && (
               <>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/pricing')} className="gap-1 text-amber-600 hover:text-amber-700">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/pricing')} className="gap-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30">
                   <Crown className="h-4 w-4" />
-                  {lang === 'ar' ? 'الاشتراكات' : 'Pricing'}
+                  <span className="hidden sm:inline">{lang === 'ar' ? 'الاشتراكات' : 'Pricing'}</span>
                 </Button>
                 {isAdmin && (
-                  <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="gap-1.5 text-primary hover:bg-primary/10">
                     <Shield className="h-4 w-4" />
-                    {lang === 'ar' ? 'الإدارة' : 'Admin'}
+                    <span className="hidden sm:inline">{lang === 'ar' ? 'الإدارة' : 'Admin'}</span>
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
+                <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} className="text-muted-foreground hover:text-foreground">
                   <Settings className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={signOut}>
+                <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hover:text-destructive">
                   <LogOut className="h-4 w-4" />
                 </Button>
               </>

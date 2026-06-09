@@ -6,6 +6,20 @@ export interface PlatformSettings {
   contact_whatsapp: string;
   contact_telegram: string;
   contact_email: string;
+  default_ai_provider: string;
+  default_ai_api_key: string;
+  default_merge_enabled: string;
+  default_merge_providers: string;
+  default_key_openai: string;
+  default_key_gemini: string;
+  default_key_gemini_pro: string;
+  default_key_deepseek_chat: string;
+  default_key_groq: string;
+  default_key_mistral: string;
+  default_key_cohere: string;
+  default_key_openrouter: string;
+  default_key_siliconflow: string;
+  [key: string]: string | number;
   plan_free_max_research: number;
   plan_free_max_pages_per_chapter: number;
   plan_free_report_pages: number;
@@ -32,6 +46,19 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   contact_whatsapp: '07862403284',
   contact_telegram: 'HayderZash',
   contact_email: 'hayderpailot@gmail.com',
+  default_ai_provider: '',
+  default_ai_api_key: '',
+  default_merge_enabled: 'false',
+  default_merge_providers: '[]',
+  default_key_openai: '',
+  default_key_gemini: '',
+  default_key_gemini_pro: '',
+  default_key_deepseek_chat: '',
+  default_key_groq: '',
+  default_key_mistral: '',
+  default_key_cohere: '',
+  default_key_openrouter: '',
+  default_key_siliconflow: '',
   plan_free_max_research: 1,
   plan_free_max_pages_per_chapter: 3,
   plan_free_report_pages: 5,
@@ -55,6 +82,14 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
 };
 
 const CACHE_KEY = 'platform_settings_cache_v1';
+
+export const getCachedPlatformSettings = (): PlatformSettings => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) return { ...DEFAULT_PLATFORM_SETTINGS, ...JSON.parse(cached) };
+  } catch {}
+  return DEFAULT_PLATFORM_SETTINGS;
+};
 
 const parseSettings = (rows: { key: string; value: string }[]): PlatformSettings => {
   const map: Record<string, string> = {};
