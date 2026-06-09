@@ -39,6 +39,7 @@ const COST_KEY: Record<string, string> = {
 export const PointsPanel = () => {
   const { lang } = useLanguage();
   const { user } = useAuth();
+  const { settings } = usePlatformSettings();
   const [accountType, setAccountType] = useState<string>('unlimited');
   const [points, setPoints] = useState<FeaturePointInfo[]>([]);
   const [loading, setLoading] = useState(true);
