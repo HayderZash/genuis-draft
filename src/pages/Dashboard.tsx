@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -151,16 +151,16 @@ const Dashboard = () => {
     navigate(routes[featureKey] || '/');
   };
 
-  const handleQuickCreate = (featureKey: string, e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleQuickCreate = (featureKey: string, e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
 
     const createActions: Record<string, () => void> = {
-      research: () => navigate('/research'),
-      thesis: () => navigate('/theses'),
-      report: () => navigate('/reports'),
+      research: () => navigate('/research?create=1'),
+      thesis: () => navigate('/theses?new=1'),
+      report: () => navigate('/reports?new=1'),
       exam: () => navigate('/exam-expert'),
       proofreading: () => navigate('/proofreading'),
-      cv: () => navigate('/cvs'),
+      cv: () => navigate('/cvs?new=1'),
       summarize: () => navigate('/summarizer'),
       translate: () => navigate('/translator'),
     };
