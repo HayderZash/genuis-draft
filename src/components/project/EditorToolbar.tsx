@@ -27,12 +27,14 @@ export const EditorToolbar = ({ editor }: Props) => {
     }
 
     try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData?.user) throw new Error('You must be signed in to upload images');
       const ext = file.name.split('.').pop() || 'png';
-      const path = `uploaded/img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const path = `${userData.user.id}/uploaded/img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error } = await supabase.storage.from('research-images').upload(path, file, { contentType: file.type });
       if (error) throw error;
       const publicUrl = supabase.storage.from('research-images').getPublicUrl(path).data.publicUrl;
-      
+
       editor.chain().focus().setImage({ src: publicUrl }).run();
       toast({ title: 'Image uploaded successfully' });
     } catch (err: any) {
